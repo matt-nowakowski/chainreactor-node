@@ -37,7 +37,7 @@ use sp_runtime::{
     create_runtime_str, generic, impl_opaque_keys,
     traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, ConvertInto, NumberFor, One},
     transaction_validity::{TransactionPriority, TransactionSource, TransactionValidity},
-    ApplyExtrinsicResult, FixedPointNumber, Percent, RuntimeAppPublic,
+    ApplyExtrinsicResult, FixedPointNumber, RuntimeAppPublic,
 };
 use sp_std::prelude::*;
 #[cfg(feature = "std")]
@@ -49,6 +49,8 @@ use proxy_config::AvnProxyConfig;
 
 #[cfg(feature = "prediction-markets")]
 pub use prediction_market_primitives::{constants::*, types::*};
+#[cfg(feature = "prediction-markets")]
+use sp_runtime::Percent;
 
 // Types from common_primitives needed when prediction-markets feature is off
 #[cfg(not(feature = "prediction-markets"))]

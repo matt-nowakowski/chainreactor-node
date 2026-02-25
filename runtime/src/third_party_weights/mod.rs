@@ -16,5 +16,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
+#[cfg(feature = "prediction-markets")]
 pub mod orml_currencies;
+#[cfg(feature = "prediction-markets")]
 pub mod orml_tokens;
