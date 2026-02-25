@@ -80,6 +80,7 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                 proof,
                 batch_id: _,
             }) => return Some(proof.clone()),
+            #[cfg(feature = "prediction-markets")]
             RuntimeCall::PredictionMarkets(
                 pallet_prediction_markets::Call::signed_create_market_and_deploy_pool {
                     proof,
@@ -96,11 +97,13 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                     swap_fee: _,
                 },
             ) => return Some(proof.clone()),
+            #[cfg(feature = "prediction-markets")]
             RuntimeCall::PredictionMarkets(pallet_prediction_markets::Call::signed_report {
                 proof,
                 market_id: _,
                 outcome: _,
             }) => return Some(proof.clone()),
+            #[cfg(feature = "prediction-markets")]
             RuntimeCall::PredictionMarkets(
                 pallet_prediction_markets::Call::signed_transfer_asset {
                     proof,
@@ -109,9 +112,11 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                     amount: _,
                 },
             ) => return Some(proof.clone()),
+            #[cfg(feature = "prediction-markets")]
             RuntimeCall::PredictionMarkets(
                 pallet_prediction_markets::Call::signed_redeem_shares { proof, market_id: _ },
             ) => return Some(proof.clone()),
+            #[cfg(feature = "prediction-markets")]
             RuntimeCall::PredictionMarkets(
                 pallet_prediction_markets::Call::signed_withdraw_tokens {
                     proof,
@@ -119,6 +124,7 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                     amount: _,
                 },
             ) => return Some(proof.clone()),
+            #[cfg(feature = "prediction-markets")]
             RuntimeCall::PredictionMarkets(
                 pallet_prediction_markets::Call::signed_buy_complete_set {
                     proof,
@@ -126,6 +132,7 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                     amount: _,
                 },
             ) => return Some(proof.clone()),
+            #[cfg(feature = "prediction-markets")]
             RuntimeCall::HybridRouter(pallet_pm_hybrid_router::Call::signed_buy {
                 proof,
                 market_id: _,
@@ -136,6 +143,7 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                 orders: _,
                 strategy: _,
             }) => return Some(proof.clone()),
+            #[cfg(feature = "prediction-markets")]
             RuntimeCall::HybridRouter(pallet_pm_hybrid_router::Call::signed_sell {
                 proof,
                 market_id: _,
@@ -153,6 +161,7 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                 signing_key: _,
                 block_number: _,
             }) => return Some(proof.clone()),
+            #[cfg(feature = "prediction-markets")]
             RuntimeCall::NeoSwaps(pallet_pm_neo_swaps::Call::signed_join {
                 proof,
                 market_id: _,
@@ -160,6 +169,7 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                 max_amounts_in: _,
                 block_number: _,
             }) => return Some(proof.clone()),
+            #[cfg(feature = "prediction-markets")]
             RuntimeCall::NeoSwaps(pallet_pm_neo_swaps::Call::signed_exit {
                 proof,
                 market_id: _,
@@ -167,6 +177,7 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                 min_amounts_out: _,
                 block_number: _,
             }) => return Some(proof.clone()),
+            #[cfg(feature = "prediction-markets")]
             RuntimeCall::NeoSwaps(pallet_pm_neo_swaps::Call::signed_withdraw_fees {
                 proof,
                 market_id: _,
@@ -205,12 +216,15 @@ impl InnerCallValidator for AvnProxyConfig {
                 return pallet_token_manager::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::NftManager(..) =>
                 return pallet_nft_manager::Pallet::<Runtime>::signature_is_valid(call),
+            #[cfg(feature = "prediction-markets")]
             RuntimeCall::PredictionMarkets(..) =>
                 return pallet_prediction_markets::Pallet::<Runtime>::signature_is_valid(call),
+            #[cfg(feature = "prediction-markets")]
             RuntimeCall::HybridRouter(..) =>
                 return pallet_pm_hybrid_router::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::NodeManager(..) =>
                 return pallet_node_manager::Pallet::<Runtime>::signature_is_valid(call),
+            #[cfg(feature = "prediction-markets")]
             RuntimeCall::NeoSwaps(..) =>
                 return pallet_pm_neo_swaps::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::Watchtower(..) =>
