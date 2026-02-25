@@ -1,9 +1,9 @@
 [workspace.package]
 version = "1.19.2"
-authors = ["Aventus systems team"]
-homepage = "https://www.truth-network.io/"
+authors = ["Chainreactor"]
+homepage = "https://chainreactor.io/"
 edition = "2021"
-repository = "https://github.com/Aventus-Network-Services/truth-network-node/"
+repository = "https://github.com/matt-nowakowski/chainreactor-node/"
 license = "GPL-3.0"
 
 [workspace]
