@@ -1,6 +1,7 @@
 use self::constants::{
     HALF_HOUR_SCHEDULE_PERIOD, QUORUM_FACTOR, SMALL_EVENT_CHALLENGE_PERIOD, SMALL_VOTING_PERIOD,
 };
+#[cfg(feature = "prediction-markets")]
 use codec::Encode;
 use common_primitives::{
     constants::{currency::*, *},
@@ -8,6 +9,7 @@ use common_primitives::{
 };
 use constants::{EIGHT_HOURS_SCHEDULE_PERIOD, NORMAL_EVENT_CHALLENGE_PERIOD, NORMAL_VOTING_PERIOD};
 use hex_literal::hex;
+#[cfg(feature = "prediction-markets")]
 use orml_traits::asset_registry::AssetMetadata;
 use pallet_avn::sr25519::AuthorityId as AvnId;
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
@@ -20,17 +22,21 @@ use sp_core::{
     crypto::{UncheckedInto, DEV_PHRASE},
     ecdsa, sr25519, ByteArray, Pair, Public, H160, H256,
 };
-use sp_runtime::{
-    traits::{IdentifyAccount, Verify},
-    BoundedVec,
-};
+use sp_runtime::traits::{IdentifyAccount, Verify};
+
+#[cfg(feature = "prediction-markets")]
+use sp_runtime::BoundedVec;
 use tnf_node_runtime::{
-    opaque::SessionKeys, AccountId, AnchorSummaryConfig, Asset, AssetRegistryConfig,
-    AssetRegistryStringLimit, AuraConfig, AuthorsManagerConfig, BalancesConfig, CustomMetadata,
-    EthBridgeConfig, EthereumEventsConfig, GrandpaConfig, ImOnlineConfig, NeoSwapsConfig,
-    NodeManagerConfig, PalletConfigConfig, PredictionMarketsConfig, RuntimeGenesisConfig,
-    SessionConfig, Signature, SudoConfig, SummaryConfig, SystemConfig, TokenManagerConfig,
-    WASM_BINARY,
+    opaque::SessionKeys, AccountId, AnchorSummaryConfig, AuraConfig, AuthorsManagerConfig,
+    BalancesConfig, EthBridgeConfig, EthereumEventsConfig, GrandpaConfig, ImOnlineConfig,
+    NodeManagerConfig, PalletConfigConfig, RuntimeGenesisConfig, SessionConfig, Signature,
+    SudoConfig, SummaryConfig, SystemConfig, TokenManagerConfig, WASM_BINARY,
+};
+
+#[cfg(feature = "prediction-markets")]
+use tnf_node_runtime::{
+    Asset, AssetRegistryConfig, AssetRegistryStringLimit, CustomMetadata, NeoSwapsConfig,
+    PredictionMarketsConfig,
 };
 
 pub(crate) type EthPublicKey = ecdsa::Public;
@@ -161,29 +167,6 @@ pub fn development_config() -> Result<ChainSpec, String> {
                 tnf_dev_ethereum_public_keys(),
                 None,
                 get_default_node_manager_config(),
-                AssetRegistryConfig {
-                    last_asset_id: Default::default(),
-                    assets: vec![(
-                        H160::from([1; 20]),
-                        Asset::ForeignAsset(4),
-                        AssetMetadata::<Balance, CustomMetadata, AssetRegistryStringLimit>::encode(
-                            &AssetMetadata {
-                                decimals: 6,
-                                name: BoundedVec::truncate_from(
-                                    "Eth USDC - foreign token".as_bytes().to_vec(),
-                                ),
-                                symbol: BoundedVec::truncate_from("USDC".as_bytes().to_vec()),
-                                existential_deposit: 0,
-                                location: None,
-                                additional: CustomMetadata {
-                                    eth_address: H160::from([1; 20]),
-                                    allow_as_base_asset: true,
-                                },
-                            },
-                        ),
-                    )],
-                },
-                Some(get_account_id_from_dev_seed::<sr25519::Public>()),
                 Some(get_account_id_from_dev_seed::<sr25519::Public>()),
                 Some(get_account_id_from_dev_seed::<sr25519::Public>()),
             )
@@ -248,8 +231,6 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
                 tnf_dev_ethereum_public_keys(),
                 None,
                 get_default_node_manager_config(),
-                AssetRegistryConfig { last_asset_id: Default::default(), assets: vec![] },
-                Some(get_account_id_from_dev_seed::<sr25519::Public>()),
                 Some(get_account_id_from_dev_seed::<sr25519::Public>()),
                 Some(get_account_id_from_dev_seed::<sr25519::Public>()),
             )
@@ -309,8 +290,6 @@ pub fn dev_testnet_config() -> Result<ChainSpec, String> {
                 dev_testnet_ethereum_public_keys(),
                 None,
                 get_default_node_manager_config(),
-                AssetRegistryConfig { last_asset_id: Default::default(), assets: vec![] },
-                None,
                 None,
                 None,
             )
@@ -376,8 +355,6 @@ pub fn public_testnet_config() -> Result<ChainSpec, String> {
                     heartbeat_period: 10u32,
                     reward_amount: 75_000_000 * BASE,
                 },
-                AssetRegistryConfig { last_asset_id: Default::default(), assets: vec![] },
-                None,
                 None,
                 None,
             )
@@ -698,8 +675,6 @@ fn testnet_genesis(
     eth_public_keys: Vec<EthPublicKey>,
     default_non_l2_token: Option<H160>,
     node_manager: NodeManagerConfig,
-    asset_registry: AssetRegistryConfig,
-    prediction_market_admin: Option<AccountId>,
     gas_fee_recipient: Option<AccountId>,
     config_admin_account: Option<AccountId>,
 ) -> RuntimeGenesisConfig {
@@ -795,15 +770,20 @@ fn testnet_genesis(
         },
         nft_manager: Default::default(),
         node_manager,
+        #[cfg(feature = "prediction-markets")]
         advisory_committee: Default::default(),
+        #[cfg(feature = "prediction-markets")]
         tokens: Default::default(),
-        asset_registry,
+        #[cfg(feature = "prediction-markets")]
+        asset_registry: Default::default(),
+        #[cfg(feature = "prediction-markets")]
         prediction_markets: PredictionMarketsConfig {
             vault_account: Some(root_key.clone()),
-            market_admin: prediction_market_admin,
+            market_admin: None,
         },
+        #[cfg(feature = "prediction-markets")]
         neo_swaps: NeoSwapsConfig {
-            additional_swap_fee: 500_000_000, //0.05
+            additional_swap_fee: 500_000_000,
         },
         pallet_config: PalletConfigConfig {
             admin_account: config_admin_account,
@@ -884,8 +864,6 @@ pub fn mainnet_config() -> Result<ChainSpec, String> {
                     heartbeat_period: 10u32,
                     reward_amount: 75_000_000 * BASE,
                 },
-                AssetRegistryConfig { last_asset_id: Default::default(), assets: vec![] },
-                None,
                 None,
                 None,
             )

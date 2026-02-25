@@ -8,6 +8,15 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        include:
+          - variant: base
+            features: ""
+            artifact: cr-node-base-linux-amd64
+          - variant: prediction-markets
+            features: "prediction-markets"
+            artifact: cr-node-pm-linux-amd64
     steps:
       - uses: actions/checkout@v4
 
@@ -28,24 +37,44 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ matrix.variant }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-${{ matrix.variant }}-
 
-      - name: Build release binary
-        run: cargo build --release --locked
+      - name: Build release binary (${{ matrix.variant }})
+        run: |
+          if [ -n "${{ matrix.features }}" ]; then
+            cargo build --release --locked --features "${{ matrix.features }}"
+          else
+            cargo build --release --locked
+          fi
         env:
           CARGO_INCREMENTAL: 0
 
       - name: Rename binary
         run: |
-          cp target/release/cr-node target/release/cr-node-linux-amd64
-          chmod +x target/release/cr-node-linux-amd64
+          cp target/release/cr-node target/release/${{ matrix.artifact }}
+          chmod +x target/release/${{ matrix.artifact }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: target/release/${{ matrix.artifact }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: target/release/cr-node-linux-amd64
+          files: |
+            cr-node-base-linux-amd64/cr-node-base-linux-amd64
+            cr-node-pm-linux-amd64/cr-node-pm-linux-amd64
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

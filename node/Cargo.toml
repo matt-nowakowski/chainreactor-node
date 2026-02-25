@@ -96,6 +96,8 @@ substrate-build-script-utils = { version = "3.0.0", git = "https://github.com/pa
 
 [features]
 default = []
+# Enable prediction market pallets in the runtime
+prediction-markets = ["tnf-node-runtime/prediction-markets"]
 # Dependencies that are only required if runtime benchmarking should be build.
 runtime-benchmarks = [
 	"tnf-node-runtime/runtime-benchmarks",
@@ -103,7 +105,7 @@ runtime-benchmarks = [
 	"frame-benchmarking-cli/runtime-benchmarks",
 	"pallet-authors-manager/runtime-benchmarks",
 ]
-# Enable features that allow the runtime to be tried and debugged. 
+# Enable features that allow the runtime to be tried and debugged.
 # Use standalone try-runtime-cli for testing.
 try-runtime = [
 	"tnf-node-runtime/try-runtime",

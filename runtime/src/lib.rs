@@ -6,13 +6,19 @@
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
+#[cfg(feature = "prediction-markets")]
 pub mod asset_registry;
+
+// Always available
 pub mod fees;
 pub mod third_party_weights;
+
+#[cfg(feature = "prediction-markets")]
 use asset_registry::CustomAssetProcessor;
 
 use codec::{Decode, Encode, MaxEncodedLen};
 use core::cmp::Ordering;
+#[cfg(feature = "prediction-markets")]
 use orml_traits::parameter_type_with_key;
 use pallet_avn::sr25519::AuthorityId as AvnId;
 pub use pallet_avn_proxy::{Event as AvnProxyEvent, ProvableProxy};
@@ -41,7 +47,17 @@ use sp_version::RuntimeVersion;
 pub mod proxy_config;
 use proxy_config::AvnProxyConfig;
 
+#[cfg(feature = "prediction-markets")]
 pub use prediction_market_primitives::{constants::*, types::*};
+
+// Types from common_primitives needed when prediction-markets feature is off
+#[cfg(not(feature = "prediction-markets"))]
+pub use common_primitives::types::{Nonce, Hash, Moment, Signature};
+#[cfg(not(feature = "prediction-markets"))]
+pub type EthAddress = sp_core::H160;
+#[cfg(not(feature = "prediction-markets"))]
+pub const TREASURY_PALLET_ID: frame_support::PalletId = frame_support::PalletId(*b"Treasury");
+
 pub use sp_avn_common::watchtower::{ProposalId, WatchtowerHooks};
 
 pub use common_primitives::{
@@ -77,6 +93,7 @@ pub use frame_system::{
 };
 use pallet_avn_transaction_payment::AvnCurrencyAdapter;
 pub use pallet_balances::Call as BalancesCall;
+#[cfg(feature = "prediction-markets")]
 use pallet_collective::{EnsureProportionMoreThan, PrimeDefaultVote};
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::{ConstFeeMultiplier, Multiplier};
@@ -91,19 +108,23 @@ pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill, RuntimeDebug};
 use sp_std::collections::btree_set::BTreeSet;
 
+#[cfg(feature = "prediction-markets")]
 type AdvisoryCommitteeInstance = pallet_collective::Instance1;
 
+#[cfg(feature = "prediction-markets")]
 type EnsureRootOrMoreThanHalfAdvisoryCommittee = EitherOfDiverse<
     EnsureRoot<AccountId>,
     EnsureProportionMoreThan<AccountId, AdvisoryCommitteeInstance, 1, 2>,
 >;
 
+#[cfg(feature = "prediction-markets")]
 type EnsureRootOrMoreThanOneThirdAdvisoryCommittee = EitherOfDiverse<
     EnsureRoot<AccountId>,
     EnsureProportionMoreThan<AccountId, AdvisoryCommitteeInstance, 1, 3>,
 >;
 
 // More than 66%
+#[cfg(feature = "prediction-markets")]
 type EnsureRootOrMoreThanTwoThirdsAdvisoryCommittee = EitherOfDiverse<
     EnsureRoot<AccountId>,
     EnsureProportionMoreThan<AccountId, AdvisoryCommitteeInstance, 2, 3>,
@@ -164,8 +185,10 @@ impl EnsureOrigin<RuntimeOrigin> for EnsureExternalProposerOrRoot {
 pub type EnsureAdminOrRoot = EitherOfDiverse<EnsureConfigAdmin, EnsureRoot<AccountId>>;
 
 // Accounts protected from being deleted due to a too low amount of funds.
+#[cfg(feature = "prediction-markets")]
 pub struct DustRemovalWhitelist;
 
+#[cfg(feature = "prediction-markets")]
 impl Contains<AccountId> for DustRemovalWhitelist
 where
     frame_support::PalletId: sp_runtime::traits::AccountIdConversion<AccountId>,
@@ -197,11 +220,14 @@ where
     }
 }
 
+#[cfg(feature = "prediction-markets")]
 impl_fee_types!();
 
 /// ORML adapter
+#[cfg(feature = "prediction-markets")]
 pub type BasicCurrencyAdapter<R, B> =
     orml_currencies::BasicCurrencyAdapter<R, B, OrmlAmount, Balance>;
+#[cfg(feature = "prediction-markets")]
 pub type CurrencyId = Asset<MarketId>;
 
 pub type NegativeImbalance<T> = <pallet_balances::Pallet<T> as Currency<
@@ -608,7 +634,10 @@ impl pallet_eth_bridge::Config for Runtime {
     type TimeProvider = pallet_timestamp::Pallet<Runtime>;
     type ReportCorroborationOffence = ();
     type WeightInfo = pallet_eth_bridge::default_weights::SubstrateWeight<Runtime>;
+    #[cfg(feature = "prediction-markets")]
     type BridgeInterfaceNotification = (Summary, TokenManager, PredictionMarkets);
+    #[cfg(not(feature = "prediction-markets"))]
+    type BridgeInterfaceNotification = (Summary, TokenManager);
     type EthereumEventsFilter = EthBridgeTnfRuntimeEventsFilter;
 }
 
@@ -722,7 +751,10 @@ impl pallet_proxy::Config for Runtime {
 impl pallet_ethereum_events::Config for Runtime {
     type RuntimeCall = RuntimeCall;
     type RuntimeEvent = RuntimeEvent;
+    #[cfg(feature = "prediction-markets")]
     type ProcessedEventHandler = (TokenManager, NftManager, PredictionMarkets);
+    #[cfg(not(feature = "prediction-markets"))]
+    type ProcessedEventHandler = (TokenManager, NftManager);
     type MinEthBlockConfirmation = MinEthBlockConfirmation;
     type Public = <Signature as sp_runtime::traits::Verify>::Signer;
     type Signature = Signature;
@@ -773,6 +805,7 @@ impl pallet_nft_manager::Config for Runtime {
     type WeightInfo = pallet_nft_manager::default_weights::SubstrateWeight<Runtime>;
 }
 
+#[cfg(feature = "prediction-markets")]
 impl pallet_summary_watchtower::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type RuntimeCall = RuntimeCall;
@@ -919,8 +952,14 @@ impl pallet_watchtower::Config for Runtime {
     type Watchtowers = RuntimeNodeManager;
     type SignerId = NodeManagerKeyId;
     type ExternalProposerOrigin = EnsureExternalProposerOrRoot;
+    #[cfg(feature = "prediction-markets")]
     type WatchtowerHooks = (
         SummaryWatchtower,
+        pallet_summary::Pallet<Runtime, EthSummary>,
+        pallet_summary::Pallet<Runtime, AvnAnchorSummary>,
+    );
+    #[cfg(not(feature = "prediction-markets"))]
+    type WatchtowerHooks = (
         pallet_summary::Pallet<Runtime, EthSummary>,
         pallet_summary::Pallet<Runtime, AvnAnchorSummary>,
     );
@@ -934,8 +973,10 @@ impl pallet_watchtower::Config for Runtime {
 }
 
 // Prediction market
+#[cfg(feature = "prediction-markets")]
 impl pallet_insecure_randomness_collective_flip::Config for Runtime {}
 
+#[cfg(feature = "prediction-markets")]
 parameter_types! {
     // Note: MaxMembers does not influence the pallet logic, but the worst-case weight estimation.
     pub const AdvisoryCommitteeMaxMembers: u32 = 100;
@@ -945,6 +986,7 @@ parameter_types! {
     pub MaxProposalWeight: Weight = Perbill::from_percent(50) * RuntimeBlockWeights::get().max_block;
 }
 
+#[cfg(feature = "prediction-markets")]
 impl pallet_collective::Config<AdvisoryCommitteeInstance> for Runtime {
     type DefaultVote = PrimeDefaultVote;
     type RuntimeEvent = RuntimeEvent;
@@ -958,6 +1000,7 @@ impl pallet_collective::Config<AdvisoryCommitteeInstance> for Runtime {
     type WeightInfo = pallet_collective::weights::SubstrateWeight<Runtime>;
 }
 
+#[cfg(feature = "prediction-markets")]
 parameter_types! {
     // Authorized
     pub const AuthorizedPalletId: PalletId = AUTHORIZED_PALLET_ID;
@@ -965,6 +1008,7 @@ parameter_types! {
 
 }
 
+#[cfg(feature = "prediction-markets")]
 impl pallet_pm_authorized::Config for Runtime {
     type AuthorizedDisputeResolutionOrigin = EnsureRootOrMoreThanHalfAdvisoryCommittee;
     type Currency = Balances;
@@ -976,6 +1020,7 @@ impl pallet_pm_authorized::Config for Runtime {
     type WeightInfo = pallet_pm_authorized::weights::WeightInfo<Runtime>;
 }
 
+#[cfg(feature = "prediction-markets")]
 parameter_types! {
     // Court
     /// (Slashable) Bond that is provided for overriding the last appeal.
@@ -1012,6 +1057,8 @@ parameter_types! {
     /// The interval for requesting multiple court votes at once.
     pub const RequestInterval: BlockNumber = 7 * BLOCKS_PER_DAY;
 }
+
+#[cfg(feature = "prediction-markets")]
 impl pallet_pm_court::Config for Runtime {
     type AppealBond = AppealBond;
     type BlocksPerYear = BlocksPerYear;
@@ -1039,6 +1086,7 @@ impl pallet_pm_court::Config for Runtime {
     type WeightInfo = pallet_pm_court::weights::WeightInfo<Runtime>;
 }
 
+#[cfg(feature = "prediction-markets")]
 impl pallet_pm_market_commons::Config for Runtime {
     type Balance = Balance;
     type MarketId = MarketId;
@@ -1046,6 +1094,7 @@ impl pallet_pm_market_commons::Config for Runtime {
 }
 
 // Prediction Market parameters
+#[cfg(feature = "prediction-markets")]
 parameter_types! {
     /// (Slashable) Bond that is provided for creating an advised market that needs approval.
     /// Slashed in case the market is rejected.
@@ -1119,8 +1168,10 @@ parameter_types! {
     pub const WinnerFeePercentage: Perbill = Perbill::from_percent(5);
 }
 
+#[cfg(feature = "prediction-markets")]
 impl_winner_fees!();
 
+#[cfg(feature = "prediction-markets")]
 impl pallet_prediction_markets::Config for Runtime {
     type AdvisoryBond = AdvisoryBond;
     type AdvisoryBondSlashPercentage = AdvisoryBondSlashPercentage;
@@ -1171,11 +1222,13 @@ impl pallet_prediction_markets::Config for Runtime {
     type WinnerFeeHandler = WinnerFee;
 }
 
+#[cfg(feature = "prediction-markets")]
 parameter_types! {
     // Asset registry
     pub const AssetRegistryStringLimit: u32 = 1024;
 }
 
+#[cfg(feature = "prediction-markets")]
 impl pallet_pm_eth_asset_registry::Config for Runtime {
     type AssetId = CurrencyId;
     type AuthorityOrigin = EnsureRoot<AccountId>;
@@ -1187,12 +1240,14 @@ impl pallet_pm_eth_asset_registry::Config for Runtime {
     type WeightInfo = ();
 }
 
+#[cfg(feature = "prediction-markets")]
 parameter_types! {
     pub const GetNativeCurrencyId: CurrencyId = Asset::Tru;
     pub const TreasuryPalletId: PalletId = TREASURY_PALLET_ID;
     pub TnfTreasuryAccount: AccountId = TreasuryPalletId::get().into_account_truncating();
 }
 
+#[cfg(feature = "prediction-markets")]
 impl orml_currencies::Config for Runtime {
     type GetNativeCurrencyId = GetNativeCurrencyId;
     type MultiCurrency = Tokens;
@@ -1207,6 +1262,7 @@ parameter_types! {
     pub const MaxReserves: u32 = 50;
 }
 
+#[cfg(feature = "prediction-markets")]
 parameter_type_with_key! {
     pub ExistentialDeposits: |currency_id: CurrencyId| -> Balance {
         match currency_id {
@@ -1231,7 +1287,9 @@ parameter_type_with_key! {
     };
 }
 
+#[cfg(feature = "prediction-markets")]
 pub struct CurrencyHooks<R>(sp_std::marker::PhantomData<R>);
+#[cfg(feature = "prediction-markets")]
 impl<C: orml_tokens::Config> orml_traits::currency::MutationHooks<AccountId, CurrencyId, Balance>
     for CurrencyHooks<C>
 {
@@ -1245,6 +1303,7 @@ impl<C: orml_tokens::Config> orml_traits::currency::MutationHooks<AccountId, Cur
     type PreTransfer = ();
 }
 
+#[cfg(feature = "prediction-markets")]
 impl orml_tokens::Config for Runtime {
     type Amount = OrmlAmount;
     type Balance = Balance;
@@ -1260,6 +1319,7 @@ impl orml_tokens::Config for Runtime {
 }
 
 // Global disputes parameters
+#[cfg(feature = "prediction-markets")]
 parameter_types! {
     pub const AddOutcomePeriod: BlockNumber = 20;
     pub const GlobalDisputeLockId: LockIdentifier = GLOBAL_DISPUTES_LOCK_ID;
@@ -1272,6 +1332,7 @@ parameter_types! {
     pub const VotingOutcomeFee: Balance = 100 * CENT_BASE;
 }
 
+#[cfg(feature = "prediction-markets")]
 impl pallet_pm_global_disputes::Config for Runtime {
     type AddOutcomePeriod = AddOutcomePeriod;
     type Currency = Balances;
@@ -1289,6 +1350,7 @@ impl pallet_pm_global_disputes::Config for Runtime {
     type WeightInfo = pallet_pm_global_disputes::weights::WeightInfo<Runtime>;
 }
 
+#[cfg(feature = "prediction-markets")]
 parameter_types! {
     // NeoSwaps
     pub const NeoSwapsMaxSwapFee: Balance = 10 * CENT_BASE;
@@ -1296,8 +1358,10 @@ parameter_types! {
     pub const MaxLiquidityTreeDepth: u32 = 9u32;
 }
 
+#[cfg(feature = "prediction-markets")]
 impl_market_creator_fees!();
 
+#[cfg(feature = "prediction-markets")]
 impl pallet_pm_neo_swaps::Config for Runtime {
     type CompleteSetOperations = PredictionMarkets;
     type ExternalFees = AdditionalSwapFee;
@@ -1316,6 +1380,7 @@ impl pallet_pm_neo_swaps::Config for Runtime {
     type OnLiquidityProvided = PredictionMarkets;
 }
 
+#[cfg(feature = "prediction-markets")]
 impl pallet_pm_order_book::Config for Runtime {
     type AssetManager = AssetManager;
     type ExternalFees = AdditionalSwapFee;
@@ -1325,6 +1390,7 @@ impl pallet_pm_order_book::Config for Runtime {
     type WeightInfo = pallet_pm_order_book::weights::WeightInfo<Runtime>;
 }
 
+#[cfg(feature = "prediction-markets")]
 impl pallet_pm_hybrid_router::Config for Runtime {
     type AssetManager = AssetManager;
     #[cfg(feature = "runtime-benchmarks")]
@@ -1344,6 +1410,48 @@ impl pallet_pm_hybrid_router::Config for Runtime {
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
+#[cfg(not(feature = "prediction-markets"))]
+construct_runtime!(
+    pub struct Runtime {
+        System: frame_system = 0,
+        Timestamp: pallet_timestamp = 1,
+        Aura: pallet_aura = 2,
+        Grandpa: pallet_grandpa = 3,
+        Balances: pallet_balances = 4,
+        TransactionPayment: pallet_transaction_payment = 5,
+        Sudo: pallet_sudo = 6,
+        Session: pallet_session = 7,
+        Authorship: pallet_authorship = 8,
+        AuthorityDiscovery: pallet_authority_discovery = 9,
+        Historical: pallet_session_historical::{Pallet} = 10,
+        Offences: pallet_offences = 11,
+        ImOnline: pallet_im_online = 12,
+        Scheduler: pallet_scheduler::{Pallet, Storage, Event<T>, Call} = 19,
+        Preimage: pallet_preimage::{Pallet, Call, Storage, Event<T>} = 20,
+        Utility: pallet_utility = 24,
+        Multisig: pallet_multisig::{Pallet, Call, Storage, Event<T>} = 25,
+
+        // AvN pallets
+        Avn: pallet_avn = 13,
+        AvnTransactionPayment: pallet_avn_transaction_payment = 14,
+        EthBridge: pallet_eth_bridge = 15,
+        Summary: pallet_summary::<Instance1> = 16,
+        EthereumEvents: pallet_ethereum_events = 17,
+        TokenManager: pallet_token_manager = 18,
+        AvnProxy: pallet_avn_proxy = 21,
+        AuthorsManager: pallet_authors_manager = 22,
+        NftManager: pallet_nft_manager = 23,
+        AnchorSummary: pallet_summary::<Instance2> = 26,
+        NodeManager: pallet_node_manager = 27,
+        PalletConfig: pallet_config = 28,
+        Watchtower: pallet_watchtower = 29,
+
+        // General-purpose pallets
+        Proxy: pallet_proxy::{Pallet, Call, Storage, Event<T>} = 48,
+    }
+);
+
+#[cfg(feature = "prediction-markets")]
 construct_runtime!(
     pub struct Runtime {
         System: frame_system = 0,
@@ -1439,7 +1547,34 @@ pub type Executive = frame_executive::Executive<
 #[macro_use]
 extern crate frame_benchmarking;
 
-#[cfg(feature = "runtime-benchmarks")]
+#[cfg(all(feature = "runtime-benchmarks", not(feature = "prediction-markets")))]
+mod benches {
+    define_benchmarks!(
+        [frame_benchmarking, BaselineBench::<Runtime>]
+        [frame_system, SystemBench::<Runtime>]
+        [pallet_balances, Balances]
+        [pallet_timestamp, Timestamp]
+        [pallet_sudo, Sudo]
+        [pallet_im_online, ImOnline]
+        [pallet_utility, Utility]
+        // AvN pallets
+        [pallet_avn, Avn]
+        [pallet_avn_transaction_payment, AvnTransactionPayment]
+        [pallet_ethereum_events, EthereumEvents]
+        [pallet_summary, Summary]
+        [pallet_token_manager, TokenManager]
+        [pallet_avn_proxy, AvnProxy]
+        [pallet_nft_manager, NftManager]
+        [pallet_node_manager, NodeManager]
+        [pallet_config, PalletConfig]
+        [pallet_watchtower, Watchtower]
+        [pallet_multisig, Multisig]
+        [pallet_proxy, Proxy]
+        [pallet_authors_manager, AuthorsManager]
+    );
+}
+
+#[cfg(all(feature = "runtime-benchmarks", feature = "prediction-markets"))]
 mod benches {
     define_benchmarks!(
         [frame_benchmarking, BaselineBench::<Runtime>]

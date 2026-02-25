@@ -69,10 +69,11 @@ pallet-token-manager = { workspace = true }
 pallet-avn-proxy = { workspace = true }
 pallet-nft-manager = { workspace = true }
 
-# Tnf pallets
+# Chainreactor base pallets
 pallet-config = { workspace = true }
 pallet-authors-manager = { workspace = true }
 pallet-node-manager = { workspace = true }
+pallet-watchtower = { workspace = true }
 
 # Used for the node's RPCs
 frame-system-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
@@ -82,31 +83,49 @@ pallet-transaction-payment-rpc-runtime-api = { version = "4.0.0-dev", default-fe
 frame-benchmarking = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk", optional = true , branch = "release-polkadot-v1.1.0" }
 frame-system-benchmarking = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk", optional = true , branch = "release-polkadot-v1.1.0" }
 
-# Prediction market
-
-prediction-market-primitives = { workspace = true }
-pallet-pm-authorized = { workspace = true }
-pallet-pm-court = { workspace = true }
-pallet-pm-market-commons = { workspace = true }
-pallet-prediction-markets = { workspace = true }
+# Prediction market pallets (optional — enabled via "prediction-markets" feature)
+prediction-market-primitives = { workspace = true, optional = true }
+pallet-pm-authorized = { workspace = true, optional = true }
+pallet-pm-court = { workspace = true, optional = true }
+pallet-pm-market-commons = { workspace = true, optional = true }
+pallet-prediction-markets = { workspace = true, optional = true }
 pallet-pm-global-disputes = { workspace = true, optional = true }
-pallet-pm-neo-swaps = { workspace = true }
-pallet-collective = { workspace = true }
-pallet-insecure-randomness-collective-flip = { workspace = true }
-orml-currencies = { workspace = true }
-orml-tokens = { workspace = true }
-orml-traits = { workspace = true }
-pallet-pm-eth-asset-registry = { workspace = true }
-pallet-pm-hybrid-router = { workspace = true }
-pallet-pm-order-book = { workspace = true }
-pallet-watchtower = { workspace = true }
-pallet-summary-watchtower = { workspace = true }
+pallet-pm-neo-swaps = { workspace = true, optional = true }
+pallet-collective = { workspace = true, optional = true }
+pallet-insecure-randomness-collective-flip = { workspace = true, optional = true }
+orml-currencies = { workspace = true, optional = true }
+orml-tokens = { workspace = true, optional = true }
+orml-traits = { workspace = true, optional = true }
+pallet-pm-eth-asset-registry = { workspace = true, optional = true }
+pallet-pm-hybrid-router = { workspace = true, optional = true }
+pallet-pm-order-book = { workspace = true, optional = true }
+pallet-summary-watchtower = { workspace = true, optional = true }
 
 [build-dependencies]
 substrate-wasm-builder = { version = "5.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk", optional = true , branch = "release-polkadot-v1.1.0" }
 
 [features]
 default = ["std"]
+
+prediction-markets = [
+	"prediction-market-primitives",
+	"pallet-pm-authorized",
+	"pallet-pm-court",
+	"pallet-pm-market-commons",
+	"pallet-prediction-markets",
+	"pallet-pm-global-disputes",
+	"pallet-pm-neo-swaps",
+	"pallet-collective",
+	"pallet-insecure-randomness-collective-flip",
+	"orml-currencies",
+	"orml-tokens",
+	"orml-traits",
+	"pallet-pm-eth-asset-registry",
+	"pallet-pm-hybrid-router",
+	"pallet-pm-order-book",
+	"pallet-summary-watchtower",
+]
+
 std = [
 	"frame-try-runtime?/std",
 	"frame-system-benchmarking?/std",
@@ -163,29 +182,29 @@ std = [
 	"pallet-avn-proxy/std",
 	"pallet-nft-manager/std",
 
-	# TNF pallets
+	# Chainreactor base pallets
 	"pallet-config/std",
 	"pallet-authors-manager/std",
 	"pallet-node-manager/std",
 	"pallet-watchtower/std",
-	"pallet-summary-watchtower/std",
 
-	# Prediction market pallets
-	"prediction-market-primitives/std",
-    "pallet-pm-authorized/std",
-    "pallet-pm-court/std",
-    "pallet-pm-market-commons/std",
-    "pallet-prediction-markets/std",
-    "pallet-pm-global-disputes/std",
-	"pallet-collective/std",
-	"pallet-insecure-randomness-collective-flip/std",
-	"pallet-pm-neo-swaps/std",
-	"orml-currencies/std",
-	"orml-tokens/std",
-	"orml-traits/std",
-	"pallet-pm-eth-asset-registry/std",
-	"pallet-pm-hybrid-router/std",
-	"pallet-pm-order-book/std",
+	# Prediction market pallets (conditional)
+	"prediction-market-primitives?/std",
+	"pallet-pm-authorized?/std",
+	"pallet-pm-court?/std",
+	"pallet-pm-market-commons?/std",
+	"pallet-prediction-markets?/std",
+	"pallet-pm-global-disputes?/std",
+	"pallet-collective?/std",
+	"pallet-insecure-randomness-collective-flip?/std",
+	"pallet-pm-neo-swaps?/std",
+	"orml-currencies?/std",
+	"orml-tokens?/std",
+	"orml-traits?/std",
+	"pallet-pm-eth-asset-registry?/std",
+	"pallet-pm-hybrid-router?/std",
+	"pallet-pm-order-book?/std",
+	"pallet-summary-watchtower?/std",
 ]
 
 runtime-benchmarks = [
@@ -216,23 +235,24 @@ runtime-benchmarks = [
 	"pallet-nft-manager/runtime-benchmarks",
 	"pallet-authors-manager/runtime-benchmarks",
 
-	# Tnf pallets
+	# Chainreactor base pallets
 	"pallet-config/runtime-benchmarks",
 	"pallet-node-manager/runtime-benchmarks",
 	"pallet-watchtower/runtime-benchmarks",
-	"pallet-summary-watchtower/runtime-benchmarks",
 
-	#Prediction maket pallet
-	"pallet-pm-authorized/runtime-benchmarks",
-    "pallet-pm-court/runtime-benchmarks",
-    "pallet-prediction-markets/runtime-benchmarks",
-    "pallet-pm-global-disputes/runtime-benchmarks",
-	"pallet-collective/runtime-benchmarks",
-	"pallet-pm-neo-swaps/runtime-benchmarks",
-	"pallet-pm-eth-asset-registry/runtime-benchmarks",
-	"pallet-pm-hybrid-router/runtime-benchmarks",
-	"pallet-pm-order-book/runtime-benchmarks",
+	# Prediction market pallets (conditional)
+	"pallet-pm-authorized?/runtime-benchmarks",
+	"pallet-pm-court?/runtime-benchmarks",
+	"pallet-prediction-markets?/runtime-benchmarks",
+	"pallet-pm-global-disputes?/runtime-benchmarks",
+	"pallet-collective?/runtime-benchmarks",
+	"pallet-pm-neo-swaps?/runtime-benchmarks",
+	"pallet-pm-eth-asset-registry?/runtime-benchmarks",
+	"pallet-pm-hybrid-router?/runtime-benchmarks",
+	"pallet-pm-order-book?/runtime-benchmarks",
+	"pallet-summary-watchtower?/runtime-benchmarks",
 ]
+
 try-runtime = [
 	"frame-try-runtime/try-runtime",
 	"frame-executive/try-runtime",
@@ -253,7 +273,6 @@ try-runtime = [
 	"pallet-proxy/try-runtime",
 	"pallet-utility/try-runtime",
 	"pallet-authority-discovery/try-runtime",
-	"pallet-insecure-randomness-collective-flip/try-runtime",
 
 	# AvN pallets
 	"pallet-avn/try-runtime",
@@ -266,24 +285,25 @@ try-runtime = [
 	"pallet-avn-proxy/try-runtime",
 	"pallet-nft-manager/try-runtime",
 
-	# Tnf pallets
+	# Chainreactor base pallets
 	"pallet-config/try-runtime",
 	"pallet-authors-manager/try-runtime",
 	"pallet-node-manager/try-runtime",
 	"pallet-watchtower/try-runtime",
-	"pallet-summary-watchtower/try-runtime",
 
-	# Prediction market pallets
-	"pallet-collective/try-runtime",
-	"pallet-pm-neo-swaps/try-runtime",
-	"pallet-pm-eth-asset-registry/try-runtime",
-	"pallet-pm-hybrid-router/try-runtime",
-	"pallet-pm-order-book/try-runtime",
-	"orml-currencies/try-runtime",
-	"orml-tokens/try-runtime",
-	"pallet-pm-market-commons/try-runtime",
-	"pallet-pm-authorized/try-runtime",
-	"pallet-prediction-markets/try-runtime",
-	"pallet-pm-court/try-runtime",
-	"pallet-pm-global-disputes/try-runtime",
+	# Prediction market pallets (conditional)
+	"pallet-collective?/try-runtime",
+	"pallet-insecure-randomness-collective-flip?/try-runtime",
+	"pallet-pm-neo-swaps?/try-runtime",
+	"pallet-pm-eth-asset-registry?/try-runtime",
+	"pallet-pm-hybrid-router?/try-runtime",
+	"pallet-pm-order-book?/try-runtime",
+	"orml-currencies?/try-runtime",
+	"orml-tokens?/try-runtime",
+	"pallet-pm-market-commons?/try-runtime",
+	"pallet-pm-authorized?/try-runtime",
+	"pallet-prediction-markets?/try-runtime",
+	"pallet-pm-court?/try-runtime",
+	"pallet-pm-global-disputes?/try-runtime",
+	"pallet-summary-watchtower?/try-runtime",
 ]
