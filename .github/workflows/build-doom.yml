@@ -1,0 +1,80 @@
+name: Build DOOM Binary
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.19.8-doom)'
+        required: true
+        type: string
+  push:
+    tags:
+      - 'v*-doom*'
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake pkg-config libssl-dev git clang libclang-dev protobuf-compiler
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-doom-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-doom-
+
+      - name: Build DOOM release binary
+        run: cargo build --release --locked --features doom
+        env:
+          CARGO_INCREMENTAL: 0
+
+      - name: Rename binary
+        run: |
+          cp target/release/cr-node target/release/cr-node-doom-linux-amd64
+          chmod +x target/release/cr-node-doom-linux-amd64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cr-node-doom-linux-amd64
+          path: target/release/cr-node-doom-linux-amd64
+
+  release:
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: "DOOM Demo - ${{ inputs.tag || github.ref_name }}"
+          files: |
+            cr-node-doom-linux-amd64/cr-node-doom-linux-amd64
+          body: |
+            DOOM on-chain demo binary. Built from `feat/doom-pallet` branch with `--features doom`.
+
+            This is a separate binary for the DOOM technical demo. It does NOT affect production deployments.
+            Production binaries (`cr-node-base` and `cr-node-pm`) are released separately from `main`.
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
