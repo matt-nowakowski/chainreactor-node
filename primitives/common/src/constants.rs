@@ -29,9 +29,9 @@ pub const TNF_CHAIN_PREFIX: u16 = 42u16;
 pub const NODE_MANAGER_PALLET_ID: PalletId = PalletId(*b"node_mgr");
 
 // Definitions for time
-// 500ms blocks for DOOM demo (default production: 6000)
-pub const MILLISECS_PER_BLOCK: u32 = 500;
-pub const BLOCKS_PER_MINUTE: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber); // 10
+// 200ms blocks for DOOM demo (default production: 6000)
+pub const MILLISECS_PER_BLOCK: u32 = 200;
+pub const BLOCKS_PER_MINUTE: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber); // 300
 pub const BLOCKS_PER_HOUR: BlockNumber = BLOCKS_PER_MINUTE * 60; // 600
 pub const BLOCKS_PER_DAY: BlockNumber = BLOCKS_PER_HOUR * 24; // 14_400
 pub const BLOCKS_PER_YEAR: BlockNumber = (BLOCKS_PER_DAY / 4) * 1461; // 365.25 days, avoids u32 overflow
