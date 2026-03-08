@@ -30,6 +30,7 @@ pub struct FullDeps<C, P, O> {
 }
 
 /// Instantiate all full RPC extensions.
+#[cfg(not(feature = "doom"))]
 pub fn create_full<C, P, O>(
     deps: FullDeps<C, P, O>,
 ) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>>
@@ -55,12 +56,44 @@ where
 
     module.merge(System::new(client.clone(), pool, deny_unsafe).into_rpc())?;
     module.merge(TransactionPayment::new(client.clone()).into_rpc())?;
-
-    // Extend this RPC with a custom API by using the following syntax.
-    // `YourRpcStruct` should have a reference to a client, which is needed
-    // to call into the runtime.
-    // `module.merge(YourRpcTrait::into_rpc(YourRpcStruct::new(ReferenceToClient, ...)))?;`
     module.merge(SummaryCalculationProvider::new(client.clone(), offchain_storage).into_rpc())?;
+
+    Ok(module)
+}
+
+/// Instantiate all full RPC extensions (with DOOM RPC).
+#[cfg(feature = "doom")]
+pub fn create_full<C, P, O>(
+    deps: FullDeps<C, P, O>,
+) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>>
+where
+    C: ProvideRuntimeApi<Block>,
+    C: HeaderBackend<Block> + HeaderMetadata<Block, Error = BlockChainError> + 'static,
+    C: Send + Sync + 'static,
+    C::Api: substrate_frame_rpc_system::AccountNonceApi<Block, AccountId, Nonce>,
+    C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
+    C::Api: doom_runtime_api::DoomApi<Block, AccountId>,
+    C::Api: BlockBuilder<Block>,
+    P: TransactionPool + 'static,
+    O: OffchainStorage + Clone + Send + Sync + 'static,
+    C: BlockBackend<Block> + UsageProvider<Block>,
+{
+    use pallet_transaction_payment_rpc::{TransactionPayment, TransactionPaymentApiServer};
+    use substrate_frame_rpc_system::{System, SystemApiServer};
+    use summary_calculation_rpc::{
+        SummaryCalculationProvider, SummaryCalculationProviderRpcServer,
+    };
+    use pallet_doom_rpc::{DoomRpc, DoomRpcApiServer};
+
+    let mut module = RpcModule::new(());
+    let FullDeps { client, pool, deny_unsafe, offchain_storage } = deps;
+
+    module.merge(System::new(client.clone(), pool, deny_unsafe).into_rpc())?;
+    module.merge(TransactionPayment::new(client.clone()).into_rpc())?;
+    module.merge(SummaryCalculationProvider::new(client.clone(), offchain_storage).into_rpc())?;
+
+    // DOOM RPC — render frames from on-chain game state
+    module.merge(DoomRpc::<_, _>::new(client.clone()).into_rpc())?;
 
     Ok(module)
 }

@@ -75,6 +75,11 @@ pallet-authors-manager = { workspace = true }
 pallet-node-manager = { workspace = true }
 pallet-watchtower = { workspace = true }
 
+# DOOM on-chain pallet
+doom-engine = { workspace = true, optional = true }
+pallet-doom = { workspace = true, optional = true }
+doom-runtime-api = { workspace = true, optional = true }
+
 # Used for the node's RPCs
 frame-system-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
 pallet-transaction-payment-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
@@ -106,6 +111,12 @@ substrate-wasm-builder = { version = "5.0.0-dev", git = "https://github.com/pari
 
 [features]
 default = ["std"]
+
+doom = [
+	"doom-engine",
+	"pallet-doom",
+	"doom-runtime-api",
+]
 
 prediction-markets = [
 	"prediction-market-primitives",
@@ -187,6 +198,11 @@ std = [
 	"pallet-authors-manager/std",
 	"pallet-node-manager/std",
 	"pallet-watchtower/std",
+
+	# DOOM pallet (conditional)
+	"doom-engine?/std",
+	"pallet-doom?/std",
+	"doom-runtime-api?/std",
 
 	# Prediction market pallets (conditional)
 	"prediction-market-primitives?/std",

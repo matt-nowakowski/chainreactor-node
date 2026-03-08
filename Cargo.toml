@@ -161,6 +161,13 @@ pallet-config = { path = "pallets/config", default-features = false }
 pallet-watchtower = { path = "pallets/watchtower", default-features = false }
 pallet-summary-watchtower = { path = "pallets/summary-watchtower", default-features = false }
 
+# DOOM on-chain (wasm)
+doom-engine = { git = "https://github.com/matt-nowakowski/chainreactor-doom", branch = "main", default-features = false, features = ["substrate"] }
+pallet-doom = { git = "https://github.com/matt-nowakowski/chainreactor-doom", branch = "main", default-features = false }
+doom-runtime-api = { git = "https://github.com/matt-nowakowski/chainreactor-doom", branch = "main", default-features = false }
+# (client)
+pallet-doom-rpc = { git = "https://github.com/matt-nowakowski/chainreactor-doom", branch = "main" }
+
 # Other (client)
 clap = "4.5.4"
 env_logger = "0.10.1"

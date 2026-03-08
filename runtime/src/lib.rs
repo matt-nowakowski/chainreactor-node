@@ -60,6 +60,9 @@ pub type EthAddress = sp_core::H160;
 #[cfg(not(feature = "prediction-markets"))]
 pub const TREASURY_PALLET_ID: frame_support::PalletId = frame_support::PalletId(*b"Treasury");
 
+#[cfg(feature = "doom")]
+pub use doom_engine;
+
 pub use sp_avn_common::watchtower::{ProposalId, WatchtowerHooks};
 
 pub use common_primitives::{
@@ -1411,8 +1414,14 @@ impl pallet_pm_hybrid_router::Config for Runtime {
     type WeightInfo = pallet_pm_hybrid_router::weights::WeightInfo<Runtime>;
 }
 
+// DOOM pallet config
+#[cfg(feature = "doom")]
+impl pallet_doom::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
-#[cfg(not(feature = "prediction-markets"))]
+#[cfg(all(not(feature = "prediction-markets"), not(feature = "doom")))]
 construct_runtime!(
     pub struct Runtime {
         System: frame_system = 0,
@@ -1450,6 +1459,51 @@ construct_runtime!(
 
         // General-purpose pallets
         Proxy: pallet_proxy::{Pallet, Call, Storage, Event<T>} = 48,
+    }
+);
+
+// DOOM variant — base pallets + DOOM pallet
+#[cfg(feature = "doom")]
+construct_runtime!(
+    pub struct Runtime {
+        System: frame_system = 0,
+        Timestamp: pallet_timestamp = 1,
+        Aura: pallet_aura = 2,
+        Grandpa: pallet_grandpa = 3,
+        Balances: pallet_balances = 4,
+        TransactionPayment: pallet_transaction_payment = 5,
+        Sudo: pallet_sudo = 6,
+        Session: pallet_session = 7,
+        Authorship: pallet_authorship = 8,
+        AuthorityDiscovery: pallet_authority_discovery = 9,
+        Historical: pallet_session_historical::{Pallet} = 10,
+        Offences: pallet_offences = 11,
+        ImOnline: pallet_im_online = 12,
+        Scheduler: pallet_scheduler::{Pallet, Storage, Event<T>, Call} = 19,
+        Preimage: pallet_preimage::{Pallet, Call, Storage, Event<T>} = 20,
+        Utility: pallet_utility = 24,
+        Multisig: pallet_multisig::{Pallet, Call, Storage, Event<T>} = 25,
+
+        // AvN pallets
+        Avn: pallet_avn = 13,
+        AvnTransactionPayment: pallet_avn_transaction_payment = 14,
+        EthBridge: pallet_eth_bridge = 15,
+        Summary: pallet_summary::<Instance1> = 16,
+        EthereumEvents: pallet_ethereum_events = 17,
+        TokenManager: pallet_token_manager = 18,
+        AvnProxy: pallet_avn_proxy = 21,
+        AuthorsManager: pallet_authors_manager = 22,
+        NftManager: pallet_nft_manager = 23,
+        AnchorSummary: pallet_summary::<Instance2> = 26,
+        NodeManager: pallet_node_manager = 27,
+        PalletConfig: pallet_config = 28,
+        Watchtower: pallet_watchtower = 29,
+
+        // General-purpose pallets
+        Proxy: pallet_proxy::{Pallet, Call, Storage, Event<T>} = 48,
+
+        // DOOM on-chain game engine
+        Doom: pallet_doom = 50,
     }
 );
 
@@ -1908,6 +1962,37 @@ impl_runtime_apis! {
             // NOTE: intentional unwrap: we don't want to propagate the error backwards, and want to
             // have a backtrace here.
             Executive::try_execute_block(block, state_root_check, signature_check, select).expect("execute-block failed")
+        }
+    }
+
+    #[cfg(feature = "doom")]
+    impl doom_runtime_api::DoomApi<Block, AccountId> for Runtime {
+        fn game_state(player: AccountId) -> Option<doom_engine::GameState> {
+            pallet_doom::GameStates::<Runtime>::get(&player)
+        }
+
+        fn render_frame(player: AccountId) -> sp_std::vec::Vec<u8> {
+            // Rendering only works in native context (std) — WASM returns empty
+            #[cfg(feature = "std")]
+            {
+                match pallet_doom::GameStates::<Runtime>::get(&player) {
+                    Some(state) => {
+                        let mut fb = doom_engine::Framebuffer::new();
+                        doom_engine::render_frame(&state, &mut fb);
+                        fb.rgba
+                    }
+                    None => sp_std::vec::Vec::new(),
+                }
+            }
+            #[cfg(not(feature = "std"))]
+            {
+                let _ = player;
+                sp_std::vec::Vec::new()
+            }
+        }
+
+        fn has_active_game(player: AccountId) -> bool {
+            pallet_doom::GameStates::<Runtime>::contains_key(&player)
         }
     }
 }

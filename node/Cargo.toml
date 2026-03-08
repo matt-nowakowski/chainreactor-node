@@ -84,6 +84,10 @@ tnf-service = { path = "./tnf-service" }
 summary-calculation-rpc = { path = "./summary-calculation-rpc" }
 avn-key-subcommand = { path = "./avn-key-subcommand" }
 
+# DOOM RPC (optional)
+doom-runtime-api = { workspace = true, optional = true }
+pallet-doom-rpc = { workspace = true, optional = true }
+
 # CLI-specific dependencies
 # Note: try-runtime-cli is now a standalone tool, not embedded
 
@@ -98,6 +102,8 @@ substrate-build-script-utils = { version = "3.0.0", git = "https://github.com/pa
 default = []
 # Enable prediction market pallets in the runtime
 prediction-markets = ["tnf-node-runtime/prediction-markets"]
+# Enable DOOM on-chain game engine
+doom = ["tnf-node-runtime/doom", "doom-runtime-api", "pallet-doom-rpc"]
 # Dependencies that are only required if runtime benchmarking should be build.
 runtime-benchmarks = [
 	"tnf-node-runtime/runtime-benchmarks",

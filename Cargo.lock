@@ -1378,6 +1378,72 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcb25d077389e53838a8158c8e99174c5a9d902dee4904320db714f3c653ffba"
 
 [[package]]
+name = "cr-node"
+version = "1.19.2"
+dependencies = [
+ "avn-key-subcommand",
+ "cfg-if 0.1.10",
+ "clap 4.5.4",
+ "common-primitives",
+ "doom-runtime-api",
+ "frame-benchmarking",
+ "frame-benchmarking-cli",
+ "frame-system",
+ "futures",
+ "hex",
+ "hex-literal",
+ "jsonrpsee",
+ "log",
+ "orml-traits",
+ "pallet-authors-manager",
+ "pallet-avn",
+ "pallet-doom-rpc",
+ "pallet-eth-bridge",
+ "pallet-eth-bridge-runtime-api",
+ "pallet-im-online",
+ "pallet-transaction-payment",
+ "pallet-transaction-payment-rpc",
+ "parity-scale-codec 3.6.9",
+ "sc-basic-authorship",
+ "sc-chain-spec",
+ "sc-cli",
+ "sc-client-api",
+ "sc-consensus",
+ "sc-consensus-aura",
+ "sc-consensus-grandpa",
+ "sc-executor",
+ "sc-network",
+ "sc-offchain",
+ "sc-rpc-api",
+ "sc-service",
+ "sc-statement-store",
+ "sc-telemetry",
+ "sc-transaction-pool",
+ "sc-transaction-pool-api",
+ "serde",
+ "serde_json",
+ "sp-api",
+ "sp-authority-discovery",
+ "sp-avn-common",
+ "sp-block-builder",
+ "sp-blockchain",
+ "sp-consensus-aura",
+ "sp-consensus-grandpa",
+ "sp-core",
+ "sp-inherents",
+ "sp-io",
+ "sp-keyring",
+ "sp-offchain",
+ "sp-runtime",
+ "sp-timestamp",
+ "substrate-build-script-utils",
+ "substrate-frame-rpc-system",
+ "summary-calculation-rpc",
+ "tnf-node-runtime",
+ "tnf-service",
+]
+
+[[package]]
 name = "cranelift-bforest"
 version = "0.95.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1908,6 +1974,27 @@ dependencies = [
  "termcolor",
  "toml 0.8.2",
  "walkdir",
+]
+
+[[package]]
+name = "doom-engine"
+version = "0.1.0"
+source = "git+https://github.com/matt-nowakowski/chainreactor-doom?branch=main#90c560363019eb0093a695d7d1c4a12ec3836ed9"
+dependencies = [
+ "libm",
+ "parity-scale-codec 3.6.9",
+ "scale-info",
+ "serde",
+]
+
+[[package]]
+name = "doom-runtime-api"
+version = "0.1.0"
+source = "git+https://github.com/matt-nowakowski/chainreactor-doom?branch=main#90c560363019eb0093a695d7d1c4a12ec3836ed9"
+dependencies = [
+ "doom-engine",
+ "parity-scale-codec 3.6.9",
+ "sp-api",
 ]
 
 [[package]]
@@ -3882,6 +3969,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "libm"
+version = "0.2.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
+
+[[package]]
 name = "libp2p"
 version = "0.51.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5351,6 +5444,35 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0)",
+]
+
+[[package]]
+name = "pallet-doom"
+version = "0.1.0"
+source = "git+https://github.com/matt-nowakowski/chainreactor-doom?branch=main#90c560363019eb0093a695d7d1c4a12ec3836ed9"
+dependencies = [
+ "doom-engine",
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec 3.6.9",
+ "scale-info",
+ "serde",
+ "sp-runtime",
+ "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0)",
+]
+
+[[package]]
+name = "pallet-doom-rpc"
+version = "0.1.0"
+source = "git+https://github.com/matt-nowakowski/chainreactor-doom?branch=main#90c560363019eb0093a695d7d1c4a12ec3836ed9"
+dependencies = [
+ "doom-runtime-api",
+ "jsonrpsee",
+ "parity-scale-codec 3.6.9",
+ "sp-api",
+ "sp-blockchain",
+ "sp-runtime",
 ]
 
 [[package]]
@@ -10364,74 +10486,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
-name = "cr-node"
-version = "1.19.2"
-dependencies = [
- "avn-key-subcommand",
- "cfg-if 0.1.10",
- "clap 4.5.4",
- "common-primitives",
- "frame-benchmarking",
- "frame-benchmarking-cli",
- "frame-system",
- "futures",
- "hex",
- "hex-literal",
- "jsonrpsee",
- "log",
- "orml-traits",
- "pallet-authors-manager",
- "pallet-avn",
- "pallet-eth-bridge",
- "pallet-eth-bridge-runtime-api",
- "pallet-im-online",
- "pallet-transaction-payment",
- "pallet-transaction-payment-rpc",
- "parity-scale-codec 3.6.9",
- "sc-basic-authorship",
- "sc-chain-spec",
- "sc-cli",
- "sc-client-api",
- "sc-consensus",
- "sc-consensus-aura",
- "sc-consensus-grandpa",
- "sc-executor",
- "sc-network",
- "sc-offchain",
- "sc-rpc-api",
- "sc-service",
- "sc-statement-store",
- "sc-telemetry",
- "sc-transaction-pool",
- "sc-transaction-pool-api",
- "serde",
- "serde_json",
- "sp-api",
- "sp-authority-discovery",
- "sp-avn-common",
- "sp-block-builder",
- "sp-blockchain",
- "sp-consensus-aura",
- "sp-consensus-grandpa",
- "sp-core",
- "sp-inherents",
- "sp-io",
- "sp-keyring",
- "sp-offchain",
- "sp-runtime",
- "sp-timestamp",
- "substrate-build-script-utils",
- "substrate-frame-rpc-system",
- "summary-calculation-rpc",
- "tnf-node-runtime",
- "tnf-service",
-]
-
-[[package]]
 name = "tnf-node-runtime"
 version = "1.19.2"
 dependencies = [
  "common-primitives",
+ "doom-engine",
+ "doom-runtime-api",
  "frame-benchmarking",
  "frame-executive",
  "frame-support",
@@ -10453,6 +10513,7 @@ dependencies = [
  "pallet-balances",
  "pallet-collective",
  "pallet-config",
+ "pallet-doom",
  "pallet-eth-bridge",
  "pallet-eth-bridge-runtime-api",
  "pallet-ethereum-events",
