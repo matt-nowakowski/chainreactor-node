@@ -1979,7 +1979,7 @@ dependencies = [
 [[package]]
 name = "doom-engine"
 version = "0.1.0"
-source = "git+https://github.com/matt-nowakowski/chainreactor-doom?branch=main#2f23c814434500d4f3e98ec7e7c916d84b3502fd"
+source = "git+https://github.com/matt-nowakowski/chainreactor-doom?branch=main#8d3de46a4f03833035a2de105528c348258afe80"
 dependencies = [
  "libm",
  "parity-scale-codec 3.6.9",
@@ -1990,7 +1990,7 @@ dependencies = [
 [[package]]
 name = "doom-runtime-api"
 version = "0.1.0"
-source = "git+https://github.com/matt-nowakowski/chainreactor-doom?branch=main#2f23c814434500d4f3e98ec7e7c916d84b3502fd"
+source = "git+https://github.com/matt-nowakowski/chainreactor-doom?branch=main#8d3de46a4f03833035a2de105528c348258afe80"
 dependencies = [
  "doom-engine",
  "parity-scale-codec 3.6.9",
@@ -3456,7 +3456,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite 0.2.14",
- "socket2 0.4.10",
+ "socket2 0.5.7",
  "tokio",
  "tower-service",
  "tracing",
@@ -5449,7 +5449,7 @@ dependencies = [
 [[package]]
 name = "pallet-doom"
 version = "0.1.0"
-source = "git+https://github.com/matt-nowakowski/chainreactor-doom?branch=main#2f23c814434500d4f3e98ec7e7c916d84b3502fd"
+source = "git+https://github.com/matt-nowakowski/chainreactor-doom?branch=main#8d3de46a4f03833035a2de105528c348258afe80"
 dependencies = [
  "doom-engine",
  "frame-support",
@@ -5465,7 +5465,7 @@ dependencies = [
 [[package]]
 name = "pallet-doom-rpc"
 version = "0.1.0"
-source = "git+https://github.com/matt-nowakowski/chainreactor-doom?branch=main#2f23c814434500d4f3e98ec7e7c916d84b3502fd"
+source = "git+https://github.com/matt-nowakowski/chainreactor-doom?branch=main#8d3de46a4f03833035a2de105528c348258afe80"
 dependencies = [
  "doom-engine",
  "doom-runtime-api",
@@ -10968,7 +10968,7 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "digest 0.10.7",
  "rand 0.8.5",
  "static_assertions",
