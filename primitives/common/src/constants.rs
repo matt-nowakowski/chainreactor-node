@@ -34,7 +34,7 @@ pub const MILLISECS_PER_BLOCK: u32 = 500;
 pub const BLOCKS_PER_MINUTE: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber); // 10
 pub const BLOCKS_PER_HOUR: BlockNumber = BLOCKS_PER_MINUTE * 60; // 600
 pub const BLOCKS_PER_DAY: BlockNumber = BLOCKS_PER_HOUR * 24; // 14_400
-pub const BLOCKS_PER_YEAR: BlockNumber = (BLOCKS_PER_DAY * 36525) / 100; // 5_259_600
+pub const BLOCKS_PER_YEAR: BlockNumber = (BLOCKS_PER_DAY / 4) * 1461; // 365.25 days, avoids u32 overflow
                                                                          // NOTE: Currently it is not possible to change the slot duration after the chain has started.
                                                                          //       Attempting to do so will brick block production.
 pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK as u64;
