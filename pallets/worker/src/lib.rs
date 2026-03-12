@@ -26,6 +26,11 @@ pub use pallet::*;
 mod types;
 pub use types::*;
 
+#[cfg(test)]
+mod mock;
+#[cfg(test)]
+mod tests;
+
 use frame_support::{
 	pallet_prelude::*,
 	traits::{Currency, ReservableCurrency, ExistenceRequirement},
