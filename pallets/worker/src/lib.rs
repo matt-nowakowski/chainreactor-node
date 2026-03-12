@@ -79,10 +79,6 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxVotesPerRound: Get<u32>;
 
-		/// Cooldown blocks after subscribing before votes are accepted.
-		#[pallet::constant]
-		type SubscriptionCooldown: Get<u32>;
-
 		/// Weight information.
 		type WeightInfo: WeightInfo;
 	}
@@ -96,6 +92,8 @@ pub mod pallet {
 		fn claim_rewards() -> Weight;
 		fn fund_reward_pool() -> Weight;
 		fn set_group_active() -> Weight;
+		fn set_subscription_cooldown() -> Weight;
+		fn update_solution_group() -> Weight;
 	}
 
 	/// Default weight impl (placeholder — benchmark later).
@@ -108,9 +106,20 @@ pub mod pallet {
 		fn claim_rewards() -> Weight { Weight::from_parts(100_000_000, 0) }
 		fn fund_reward_pool() -> Weight { Weight::from_parts(50_000_000, 0) }
 		fn set_group_active() -> Weight { Weight::from_parts(25_000_000, 0) }
+		fn set_subscription_cooldown() -> Weight { Weight::from_parts(10_000_000, 0) }
+		fn update_solution_group() -> Weight { Weight::from_parts(50_000_000, 0) }
 	}
 
 	// ─── Storage ───────────────────────────────────────────────
+
+	/// Subscription cooldown in blocks — configurable via sudo.
+	/// Default: 1200 blocks (~2h at 6s block time).
+	#[pallet::storage]
+	pub type SubscriptionCooldownBlocks<T> = StorageValue<_, u32, ValueQuery, DefaultCooldown>;
+
+	/// Default cooldown value (1200 blocks).
+	#[pallet::type_value]
+	pub fn DefaultCooldown() -> u32 { 1200 }
 
 	/// Auto-incrementing counter for solution group IDs.
 	#[pallet::storage]
@@ -276,6 +285,14 @@ pub mod pallet {
 			solution_group_id: SolutionGroupId,
 			period: RewardPeriodIndex,
 			accuracy: Perbill,
+		},
+		/// Subscription cooldown was updated.
+		SubscriptionCooldownUpdated {
+			blocks: u32,
+		},
+		/// Solution group parameters were updated.
+		SolutionGroupUpdated {
+			id: SolutionGroupId,
 		},
 	}
 
@@ -517,7 +534,7 @@ pub mod pallet {
 			ensure!(sub.active, Error::<T>::NotSubscribed);
 
 			let now = <frame_system::Pallet<T>>::block_number();
-			let cooldown = T::SubscriptionCooldown::get();
+			let cooldown = SubscriptionCooldownBlocks::<T>::get();
 			let cooldown_end = sub.subscribed_at.saturating_add(cooldown.into());
 			ensure!(now >= cooldown_end, Error::<T>::SubscriptionCooldown);
 
@@ -737,6 +754,57 @@ pub mod pallet {
 			});
 
 			Ok(())
+		}
+
+		/// Set the subscription cooldown period (in blocks). Root only.
+		#[pallet::call_index(8)]
+		#[pallet::weight(T::WeightInfo::set_subscription_cooldown())]
+		pub fn set_subscription_cooldown(
+			origin: OriginFor<T>,
+			blocks: u32,
+		) -> DispatchResult {
+			ensure_root(origin)?;
+			SubscriptionCooldownBlocks::<T>::put(blocks);
+			Self::deposit_event(Event::SubscriptionCooldownUpdated { blocks });
+			Ok(())
+		}
+
+		/// Update a solution group's parameters. Root only.
+		/// Pass `None` for any field to leave it unchanged.
+		#[pallet::call_index(9)]
+		#[pallet::weight(T::WeightInfo::update_solution_group())]
+		pub fn update_solution_group(
+			origin: OriginFor<T>,
+			solution_group_id: SolutionGroupId,
+			stake_requirement: Option<BalanceOf<T>>,
+			sla_threshold: Option<Perbill>,
+			consensus_threshold: Option<Perbill>,
+			round_length: Option<u32>,
+		) -> DispatchResult {
+			ensure_root(origin)?;
+
+			SolutionGroups::<T>::try_mutate(solution_group_id, |maybe_group| {
+				let group = maybe_group.as_mut().ok_or(Error::<T>::SolutionGroupNotFound)?;
+
+				if let Some(stake) = stake_requirement {
+					group.stake_requirement = stake;
+				}
+				if let Some(sla) = sla_threshold {
+					group.sla_threshold = sla;
+				}
+				if let Some(consensus) = consensus_threshold {
+					group.consensus_threshold = consensus;
+				}
+				if let Some(length) = round_length {
+					group.round_length = length;
+				}
+
+				Self::deposit_event(Event::SolutionGroupUpdated {
+					id: solution_group_id,
+				});
+
+				Ok(())
+			})
 		}
 	}
 

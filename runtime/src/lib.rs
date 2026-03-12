@@ -981,7 +981,6 @@ parameter_types! {
     pub const MaxWorkerNameLen: u32 = 128;
     pub const MaxSolutionGroups: u32 = 256;
     pub const MaxVotesPerRound: u32 = 1024;
-    pub const WorkerSubscriptionCooldown: u32 = 1200; // ~2h at 6s block time
 }
 
 #[cfg(feature = "worker")]
@@ -992,7 +991,6 @@ impl pallet_worker::Config for Runtime {
     type MaxNameLen = MaxWorkerNameLen;
     type MaxSolutionGroups = MaxSolutionGroups;
     type MaxVotesPerRound = MaxVotesPerRound;
-    type SubscriptionCooldown = WorkerSubscriptionCooldown;
     type WeightInfo = ();
 }
 

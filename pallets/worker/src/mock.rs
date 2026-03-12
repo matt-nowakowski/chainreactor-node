@@ -73,7 +73,6 @@ impl pallet_worker::Config for TestRuntime {
 	type MaxNameLen = ConstU32<128>;
 	type MaxSolutionGroups = ConstU32<256>;
 	type MaxVotesPerRound = ConstU32<1024>;
-	type SubscriptionCooldown = ConstU32<0>; // No cooldown for tests
 	type WeightInfo = ();
 }
 
@@ -98,6 +97,9 @@ impl ExtBuilder {
 		let mut ext = sp_io::TestExternalities::from(storage);
 		ext.execute_with(|| {
 			System::set_block_number(1);
+
+			// No cooldown for tests
+			pallet_worker::SubscriptionCooldownBlocks::<TestRuntime>::put(0u32);
 
 			// Fund test accounts
 			for &(who, amount) in &[
