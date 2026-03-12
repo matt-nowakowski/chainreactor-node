@@ -17,6 +17,9 @@ jobs:
           - variant: prediction-markets
             features: "prediction-markets"
             artifact: cr-node-pm-linux-amd64
+          - variant: worker
+            features: "worker"
+            artifact: cr-node-worker-linux-amd64
     steps:
       - uses: actions/checkout@v4
 
@@ -77,6 +80,7 @@ jobs:
           files: |
             cr-node-base-linux-amd64/cr-node-base-linux-amd64
             cr-node-pm-linux-amd64/cr-node-pm-linux-amd64
+            cr-node-worker-linux-amd64/cr-node-worker-linux-amd64
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
