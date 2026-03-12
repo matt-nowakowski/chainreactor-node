@@ -1378,6 +1378,70 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcb25d077389e53838a8158c8e99174c5a9d902dee4904320db714f3c653ffba"
 
 [[package]]
+name = "cr-node"
+version = "1.19.2"
+dependencies = [
+ "avn-key-subcommand",
+ "cfg-if 0.1.10",
+ "clap 4.5.4",
+ "common-primitives",
+ "frame-benchmarking",
+ "frame-benchmarking-cli",
+ "frame-system",
+ "futures",
+ "hex",
+ "hex-literal",
+ "jsonrpsee",
+ "log",
+ "orml-traits",
+ "pallet-authors-manager",
+ "pallet-avn",
+ "pallet-eth-bridge",
+ "pallet-eth-bridge-runtime-api",
+ "pallet-im-online",
+ "pallet-transaction-payment",
+ "pallet-transaction-payment-rpc",
+ "parity-scale-codec 3.6.9",
+ "sc-basic-authorship",
+ "sc-chain-spec",
+ "sc-cli",
+ "sc-client-api",
+ "sc-consensus",
+ "sc-consensus-aura",
+ "sc-consensus-grandpa",
+ "sc-executor",
+ "sc-network",
+ "sc-offchain",
+ "sc-rpc-api",
+ "sc-service",
+ "sc-statement-store",
+ "sc-telemetry",
+ "sc-transaction-pool",
+ "sc-transaction-pool-api",
+ "serde",
+ "serde_json",
+ "sp-api",
+ "sp-authority-discovery",
+ "sp-avn-common",
+ "sp-block-builder",
+ "sp-blockchain",
+ "sp-consensus-aura",
+ "sp-consensus-grandpa",
+ "sp-core",
+ "sp-inherents",
+ "sp-io",
+ "sp-keyring",
+ "sp-offchain",
+ "sp-runtime",
+ "sp-timestamp",
+ "substrate-build-script-utils",
+ "substrate-frame-rpc-system",
+ "summary-calculation-rpc",
+ "tnf-node-runtime",
+ "tnf-service",
+]
+
+[[package]]
 name = "cranelift-bforest"
 version = "0.95.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6122,6 +6186,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-worker"
+version = "1.19.2"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-balances",
+ "pallet-node-manager",
+ "pallet-timestamp",
+ "parity-scale-codec 3.6.9",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 8.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0)",
+]
+
+[[package]]
 name = "parity-db"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10364,70 +10447,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
-name = "cr-node"
-version = "1.19.2"
-dependencies = [
- "avn-key-subcommand",
- "cfg-if 0.1.10",
- "clap 4.5.4",
- "common-primitives",
- "frame-benchmarking",
- "frame-benchmarking-cli",
- "frame-system",
- "futures",
- "hex",
- "hex-literal",
- "jsonrpsee",
- "log",
- "orml-traits",
- "pallet-authors-manager",
- "pallet-avn",
- "pallet-eth-bridge",
- "pallet-eth-bridge-runtime-api",
- "pallet-im-online",
- "pallet-transaction-payment",
- "pallet-transaction-payment-rpc",
- "parity-scale-codec 3.6.9",
- "sc-basic-authorship",
- "sc-chain-spec",
- "sc-cli",
- "sc-client-api",
- "sc-consensus",
- "sc-consensus-aura",
- "sc-consensus-grandpa",
- "sc-executor",
- "sc-network",
- "sc-offchain",
- "sc-rpc-api",
- "sc-service",
- "sc-statement-store",
- "sc-telemetry",
- "sc-transaction-pool",
- "sc-transaction-pool-api",
- "serde",
- "serde_json",
- "sp-api",
- "sp-authority-discovery",
- "sp-avn-common",
- "sp-block-builder",
- "sp-blockchain",
- "sp-consensus-aura",
- "sp-consensus-grandpa",
- "sp-core",
- "sp-inherents",
- "sp-io",
- "sp-keyring",
- "sp-offchain",
- "sp-runtime",
- "sp-timestamp",
- "substrate-build-script-utils",
- "substrate-frame-rpc-system",
- "summary-calculation-rpc",
- "tnf-node-runtime",
- "tnf-service",
-]
-
-[[package]]
 name = "tnf-node-runtime"
 version = "1.19.2"
 dependencies = [
@@ -10485,6 +10504,7 @@ dependencies = [
  "pallet-transaction-payment-rpc-runtime-api",
  "pallet-utility",
  "pallet-watchtower",
+ "pallet-worker",
  "parity-scale-codec 3.6.9",
  "prediction-market-primitives",
  "scale-info",

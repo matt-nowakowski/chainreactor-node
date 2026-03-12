@@ -974,6 +974,28 @@ impl pallet_watchtower::Config for Runtime {
     type MaxInternalProposalLen = ConstU32<4096>;
 }
 
+// Worker pallet (optional — enabled via "worker" feature)
+#[cfg(feature = "worker")]
+parameter_types! {
+    pub const WorkerPalletId: PalletId = PalletId(*b"cr/workr");
+    pub const MaxWorkerNameLen: u32 = 128;
+    pub const MaxSolutionGroups: u32 = 256;
+    pub const MaxVotesPerRound: u32 = 1024;
+    pub const WorkerSubscriptionCooldown: u32 = 1200; // ~2h at 6s block time
+}
+
+#[cfg(feature = "worker")]
+impl pallet_worker::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Currency = Balances;
+    type WorkerPalletId = WorkerPalletId;
+    type MaxNameLen = MaxWorkerNameLen;
+    type MaxSolutionGroups = MaxSolutionGroups;
+    type MaxVotesPerRound = MaxVotesPerRound;
+    type SubscriptionCooldown = WorkerSubscriptionCooldown;
+    type WeightInfo = ();
+}
+
 // Prediction market
 #[cfg(feature = "prediction-markets")]
 impl pallet_insecure_randomness_collective_flip::Config for Runtime {}
@@ -1412,7 +1434,7 @@ impl pallet_pm_hybrid_router::Config for Runtime {
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
-#[cfg(not(feature = "prediction-markets"))]
+#[cfg(all(not(feature = "prediction-markets"), not(feature = "worker")))]
 construct_runtime!(
     pub struct Runtime {
         System: frame_system = 0,
@@ -1447,6 +1469,51 @@ construct_runtime!(
         NodeManager: pallet_node_manager = 27,
         PalletConfig: pallet_config = 28,
         Watchtower: pallet_watchtower = 29,
+
+        // General-purpose pallets
+        Proxy: pallet_proxy::{Pallet, Call, Storage, Event<T>} = 48,
+    }
+);
+
+// Worker chain variant — base pallets + worker attestation pallet
+#[cfg(feature = "worker")]
+construct_runtime!(
+    pub struct Runtime {
+        System: frame_system = 0,
+        Timestamp: pallet_timestamp = 1,
+        Aura: pallet_aura = 2,
+        Grandpa: pallet_grandpa = 3,
+        Balances: pallet_balances = 4,
+        TransactionPayment: pallet_transaction_payment = 5,
+        Sudo: pallet_sudo = 6,
+        Session: pallet_session = 7,
+        Authorship: pallet_authorship = 8,
+        AuthorityDiscovery: pallet_authority_discovery = 9,
+        Historical: pallet_session_historical::{Pallet} = 10,
+        Offences: pallet_offences = 11,
+        ImOnline: pallet_im_online = 12,
+        Scheduler: pallet_scheduler::{Pallet, Storage, Event<T>, Call} = 19,
+        Preimage: pallet_preimage::{Pallet, Call, Storage, Event<T>} = 20,
+        Utility: pallet_utility = 24,
+        Multisig: pallet_multisig::{Pallet, Call, Storage, Event<T>} = 25,
+
+        // AvN pallets
+        Avn: pallet_avn = 13,
+        AvnTransactionPayment: pallet_avn_transaction_payment = 14,
+        EthBridge: pallet_eth_bridge = 15,
+        Summary: pallet_summary::<Instance1> = 16,
+        EthereumEvents: pallet_ethereum_events = 17,
+        TokenManager: pallet_token_manager = 18,
+        AvnProxy: pallet_avn_proxy = 21,
+        AuthorsManager: pallet_authors_manager = 22,
+        NftManager: pallet_nft_manager = 23,
+        AnchorSummary: pallet_summary::<Instance2> = 26,
+        NodeManager: pallet_node_manager = 27,
+        PalletConfig: pallet_config = 28,
+        Watchtower: pallet_watchtower = 29,
+
+        // Worker chain pallet
+        Worker: pallet_worker = 51,
 
         // General-purpose pallets
         Proxy: pallet_proxy::{Pallet, Call, Storage, Event<T>} = 48,
