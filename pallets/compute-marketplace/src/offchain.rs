@@ -131,9 +131,9 @@ impl<T: Config> Pallet<T> {
 
         log::info!("🔧 Compute OCW: downloaded spec ({} bytes) for job {}", spec_bytes.len(), job_id);
 
-        // 2. Execute the job (std-only — uses host process)
+        // 2. Execute the job
         #[cfg(feature = "std")]
-        let (result_hash, output, success, error) = {
+        let (result_hash, output) = {
             let spec = match crate::engine::parse_job_spec(&spec_bytes) {
                 Ok(s) => s,
                 Err(e) => {
@@ -144,34 +144,30 @@ impl<T: Config> Pallet<T> {
             };
 
             let result = crate::engine::execute_job(&spec);
-            (result.result_hash, result.output, result.success, result.error)
+            if !result.success {
+                log::error!("🔧 Compute OCW: job {} execution failed: {:?}", job_id, result.error);
+            } else {
+                log::info!("🔧 Compute OCW: job {} executed successfully", job_id);
+            }
+            (result.result_hash, result.output)
         };
 
         #[cfg(not(feature = "std"))]
-        let (result_hash, output, success, error) = {
-            // In WASM context we cannot execute — hash the spec as a placeholder
-            let hash = T::Hashing::hash_of(&sp_core::Bytes(spec_bytes.clone()));
-            // Convert the generic hash to H256
+        let (result_hash, output) = {
+            // In WASM context we cannot execute host commands.
+            // This path only runs if the WASM runtime somehow gets here.
+            log::warn!("🔧 Compute OCW: WASM context, cannot execute job {}", job_id);
+            let hash = T::Hashing::hash_of(&spec_bytes);
             let hash_bytes: &[u8] = hash.as_ref();
-            let result_hash = if hash_bytes.len() >= 32 {
+            let rh = if hash_bytes.len() >= 32 {
                 let mut arr = [0u8; 32];
                 arr.copy_from_slice(&hash_bytes[..32]);
                 sp_core::H256(arr)
             } else {
                 sp_core::H256::zero()
             };
-            (result_hash, spec_bytes, false, Some("WASM context — cannot execute".to_string()))
+            (rh, spec_bytes)
         };
-
-        if !success {
-            log::error!(
-                "🔧 Compute OCW: job {} execution failed: {:?}",
-                job_id,
-                error
-            );
-        } else {
-            log::info!("🔧 Compute OCW: job {} executed successfully", job_id);
-        }
 
         // 3. Store result locally
         Self::store_job_output(job_id, &output);
