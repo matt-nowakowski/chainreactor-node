@@ -11,7 +11,7 @@ DROPLET_NAME="cr-compute-demo"
 REGION="nyc1"
 SIZE="s-1vcpu-2gb"  # $12/mo — 1GB too small for Substrate
 IMAGE="ubuntu-22-04-x64"
-BINARY_URL="https://github.com/matt-nowakowski/chainreactor-node/releases/download/v1.19.11-compute/cr-node-compute-linux-amd64"
+BINARY_URL="https://github.com/matt-nowakowski/chainreactor-node/releases/download/v1.19.13-compute/cr-node-compute-linux-amd64"
 
 echo "=== Creating droplet: $DROPLET_NAME ($SIZE in $REGION) ==="
 
