@@ -10489,6 +10489,7 @@ dependencies = [
  "pallet-avn-transaction-payment",
  "pallet-balances",
  "pallet-collective",
+ "pallet-compute-marketplace",
  "pallet-config",
  "pallet-eth-bridge",
  "pallet-eth-bridge-runtime-api",

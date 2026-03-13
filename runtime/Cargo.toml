@@ -78,6 +78,9 @@ pallet-watchtower = { workspace = true }
 # Worker chain pallet (optional — enabled via "worker" feature)
 pallet-worker = { workspace = true, optional = true }
 
+# Compute marketplace pallet (optional — enabled via "compute-marketplace" feature)
+pallet-compute-marketplace = { workspace = true, optional = true }
+
 # Used for the node's RPCs
 frame-system-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
 pallet-transaction-payment-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
@@ -112,6 +115,10 @@ default = ["std"]
 
 worker = [
 	"pallet-worker",
+]
+
+compute-marketplace = [
+	"pallet-compute-marketplace",
 ]
 
 prediction-markets = [
@@ -197,6 +204,9 @@ std = [
 
 	# Worker pallet (conditional)
 	"pallet-worker?/std",
+
+	# Compute marketplace pallet (conditional)
+	"pallet-compute-marketplace?/std",
 
 	# Prediction market pallets (conditional)
 	"prediction-market-primitives?/std",
