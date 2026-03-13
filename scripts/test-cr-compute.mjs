@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Test script for cr-worker daemon.
+ * Test script for cr-compute daemon.
  *
  * Sets up the chain (sudo config, register worker, submit job) but does NOT
- * inject the cmkt key — so the OCW won't execute anything. cr-worker handles it.
+ * inject the cmkt key — so the OCW won't execute anything. cr-compute handles it.
  *
  * Steps:
  * 1. Set low config values via sudo
@@ -11,7 +11,7 @@
  * 3. Fund Bob
  * 4. Bob submits a job
  * 5. Alice accepts the job
- * 6. Wait for cr-worker to execute and submit the result (NOT the OCW)
+ * 6. Wait for cr-compute to execute and submit the result (NOT the OCW)
  */
 
 import { ApiPromise, WsProvider, Keyring } from '/Users/mattnowakowski/Downloads/chainreactor/server/node_modules/@polkadot/api/index.js';
@@ -24,7 +24,7 @@ const SPEC_URL = 'http://localhost:8080/test-job.json';
 async function main() {
   await cryptoWaitReady();
 
-  console.log('=== cr-worker Test: Connecting to chain ===');
+  console.log('=== cr-compute Test: Connecting to chain ===');
   const provider = new WsProvider(WS_URL);
   const api = await ApiPromise.create({ provider });
 
@@ -49,9 +49,9 @@ async function main() {
   console.log(`\nCurrent block: #${header.number}`);
 
   // NOTE: We do NOT inject cmkt key — the OCW should NOT pick up jobs.
-  // cr-worker will handle execution instead.
+  // cr-compute will handle execution instead.
   console.log('\n⚠️  NO cmkt key injected — OCW will not execute jobs');
-  console.log('   cr-worker daemon will handle execution\n');
+  console.log('   cr-compute daemon will handle execution\n');
 
   // ─── Sudo config ───
   console.log('=== Setting up sudo config ===');
@@ -120,9 +120,9 @@ async function main() {
   console.log('✅ Alice accepted the job');
   console.log('   Status: Assigned');
 
-  // ─── Wait for cr-worker to execute ───
-  console.log('\n=== Waiting for cr-worker to execute and submit result ===');
-  console.log('   (cr-worker polls every 6s — watching for ResultSubmitted event)\n');
+  // ─── Wait for cr-compute to execute ───
+  console.log('\n=== Waiting for cr-compute to execute and submit result ===');
+  console.log('   (cr-compute polls every 6s — watching for ResultSubmitted event)\n');
 
   let completed = false;
   for (let i = 0; i < 60; i++) {
@@ -142,7 +142,7 @@ async function main() {
 
     if (status === 'Submitted' && !completed) {
       console.log('\n');
-      console.log('✅ Result submitted by cr-worker! Waiting for challenge window...');
+      console.log('✅ Result submitted by cr-compute! Waiting for challenge window...');
     }
   }
 

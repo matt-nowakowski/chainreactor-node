@@ -52,7 +52,7 @@ jobs:
           name: cr-node-compute-linux-amd64
           path: target/release/cr-node-compute-linux-amd64
 
-  build-worker-daemon:
+  build-compute-daemon:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -68,29 +68,29 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            worker-daemon/target
-          key: ${{ runner.os }}-cargo-worker-daemon-${{ hashFiles('worker-daemon/Cargo.lock') }}
+            compute-daemon/target
+          key: ${{ runner.os }}-cargo-compute-daemon-${{ hashFiles('compute-daemon/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-worker-daemon-
+            ${{ runner.os }}-cargo-compute-daemon-
 
-      - name: Build cr-worker daemon
-        run: cd worker-daemon && cargo build --release --locked
+      - name: Build cr-compute daemon
+        run: cd compute-daemon && cargo build --release --locked
         env:
           CARGO_INCREMENTAL: 0
 
       - name: Rename binary
         run: |
-          cp worker-daemon/target/release/cr-worker worker-daemon/target/release/cr-worker-linux-amd64
-          chmod +x worker-daemon/target/release/cr-worker-linux-amd64
+          cp compute-daemon/target/release/cr-compute compute-daemon/target/release/cr-compute-linux-amd64
+          chmod +x compute-daemon/target/release/cr-compute-linux-amd64
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cr-worker-linux-amd64
-          path: worker-daemon/target/release/cr-worker-linux-amd64
+          name: cr-compute-linux-amd64
+          path: compute-daemon/target/release/cr-compute-linux-amd64
 
   release:
-    needs: [build-compute-node, build-worker-daemon]
+    needs: [build-compute-node, build-compute-daemon]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -136,10 +136,10 @@ jobs:
 
             Includes:
             - `cr-node-compute-linux-amd64` — node with `compute-marketplace` pallet
-            - `cr-worker-linux-amd64` — standalone worker daemon
+            - `cr-compute-linux-amd64` — standalone compute daemon
           files: |
             cr-node-compute-linux-amd64/cr-node-compute-linux-amd64
-            cr-worker-linux-amd64/cr-worker-linux-amd64
+            cr-compute-linux-amd64/cr-compute-linux-amd64
           generate_release_notes: false
           prerelease: true
         env:

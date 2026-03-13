@@ -1,4 +1,4 @@
-//! # cr-worker — Chainreactor Compute Worker Daemon
+//! # cr-compute — Chainreactor Compute Daemon
 //!
 //! Native daemon that runs alongside cr-node on compute marketplace nodes.
 //! Watches the chain for assigned jobs via HTTP JSON-RPC polling, executes
@@ -60,8 +60,8 @@ impl Args {
                     args.job_timeout = raw.get(i).and_then(|s| s.parse().ok()).unwrap_or(300);
                 }
                 "--help" | "-h" => {
-                    eprintln!("cr-worker — Chainreactor Compute Worker Daemon\n");
-                    eprintln!("Usage: cr-worker --account <SS58_ADDRESS> [OPTIONS]\n");
+                    eprintln!("cr-compute — Chainreactor Compute Daemon\n");
+                    eprintln!("Usage: cr-compute --account <SS58_ADDRESS> [OPTIONS]\n");
                     eprintln!("Options:");
                     eprintln!("  --rpc-url <URL>              Node RPC URL [default: http://127.0.0.1:9944]");
                     eprintln!("  --account <SS58>             Worker account SS58 address (required)");
@@ -80,7 +80,7 @@ impl Args {
 
         // Also check env var
         if args.account.is_empty() {
-            if let Ok(v) = std::env::var("CR_WORKER_ACCOUNT") {
+            if let Ok(v) = std::env::var("CR_COMPUTE_ACCOUNT") {
                 args.account = v;
             }
         }
@@ -245,7 +245,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "cr_worker=info".into()),
+                .unwrap_or_else(|_| "cr_compute=info".into()),
         )
         .init();
 
@@ -255,7 +255,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let worker_pubkey = scale::ss58_decode(&args.account)
         .ok_or_else(|| format!("invalid SS58 address: {}", args.account))?;
 
-    info!("Chainreactor Compute Worker starting");
+    info!("Chainreactor Compute Daemon starting");
     info!("  Worker account: {}", args.account);
     info!("  RPC: {}", args.rpc_url);
     info!("  Heartbeat interval: {}s", args.heartbeat_interval);

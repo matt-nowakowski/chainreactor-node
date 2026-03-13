@@ -1,11 +1,11 @@
 [package]
-name = "cr-worker"
+name = "cr-compute"
 version = "0.1.0"
 edition = "2021"
-description = "Chainreactor Compute Worker Daemon — watches chain for assigned jobs, executes them natively, submits results"
+description = "Chainreactor Compute Daemon — watches chain for assigned jobs, executes them natively, submits results"
 
 [[bin]]
-name = "cr-worker"
+name = "cr-compute"
 path = "src/main.rs"
 
 [dependencies]
