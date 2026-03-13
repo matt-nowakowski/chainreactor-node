@@ -66,6 +66,14 @@ parameter_types! {
 	pub const ComputePalletId: PalletId = PalletId(*b"cr/compu");
 }
 
+impl frame_system::offchain::SendTransactionTypes<pallet_compute_marketplace::Call<TestRuntime>> for TestRuntime
+where
+	RuntimeCall: From<pallet_compute_marketplace::Call<TestRuntime>>,
+{
+	type Extrinsic = sp_runtime::testing::TestXt<RuntimeCall, ()>;
+	type OverarchingCall = RuntimeCall;
+}
+
 impl pallet_compute_marketplace::Config for TestRuntime {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;

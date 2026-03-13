@@ -15,8 +15,8 @@
 //!   a randomly selected committee votes. Slashing for dishonest workers.
 //! - **Heartbeat & Availability** — workers submit periodic heartbeats to prove
 //!   liveness. Offline workers can't accept jobs.
-//! - **IPC Sidecar Model** — the node's off-chain worker detects assigned jobs
-//!   and delegates execution to a local sidecar process via Unix socket.
+//! - **Built-in Execution** — the node's off-chain worker detects assigned jobs
+//!   and executes them natively on the host machine (command, Docker, WASM).
 //!
 //! ## Standalone Design
 //!
@@ -32,11 +32,17 @@ pub use pallet::*;
 mod types;
 pub use types::*;
 
+#[cfg(feature = "std")]
+pub mod engine;
+
+pub mod offchain;
+
 #[cfg(test)]
 mod mock;
 #[cfg(test)]
 mod tests;
 
+use parity_scale_codec::{Decode, Encode};
 use frame_support::{
 	pallet_prelude::*,
 	traits::{Currency, ReservableCurrency, ExistenceRequirement},
@@ -46,9 +52,14 @@ use frame_system::pallet_prelude::*;
 use sp_core::H256;
 use sp_runtime::{
 	traits::{AccountIdConversion, Saturating, Zero, Hash},
+	transaction_validity::{InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction},
 	Perbill, SaturatedConversion,
 };
 use sp_std::prelude::*;
+
+/// Key type for the compute marketplace OCW.
+/// Workers inject this key via `author_insertKey("cmkt", mnemonic, pubkey)`.
+pub const KEY_TYPE: sp_core::crypto::KeyTypeId = sp_core::crypto::KeyTypeId(*b"cmkt");
 
 type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -62,7 +73,9 @@ pub mod pallet {
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config: frame_system::Config
+		+ frame_system::offchain::SendTransactionTypes<Call<Self>>
+	{
 		/// The overarching event type.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -395,6 +408,10 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn offchain_worker(now: BlockNumberFor<T>) {
+			Self::run_offchain_worker(now);
+		}
+
 		fn on_initialize(now: BlockNumberFor<T>) -> Weight {
 			let mut weight = Weight::zero();
 
@@ -969,6 +986,122 @@ pub mod pallet {
 			AvailabilityPool::<T>::mutate(|pool| *pool = pool.saturating_add(amount));
 			Self::deposit_event(Event::AvailabilityPoolFunded { amount });
 			Ok(())
+		}
+
+		// ── Unsigned extrinsics (submitted by OCW) ───────────
+
+		/// Heartbeat submitted by the off-chain worker (unsigned).
+		#[pallet::call_index(18)]
+		#[pallet::weight(T::WeightInfo::submit_heartbeat())]
+		pub fn unsigned_heartbeat(
+			origin: OriginFor<T>,
+			worker: T::AccountId,
+		) -> DispatchResult {
+			ensure_none(origin)?;
+			ensure!(Workers::<T>::contains_key(&worker), Error::<T>::NotRegistered);
+
+			let now = <frame_system::Pallet<T>>::block_number();
+			let now_u64: u64 = now.saturated_into();
+
+			Heartbeats::<T>::mutate(&worker, |uptime| {
+				uptime.heartbeat_count = uptime.heartbeat_count.saturating_add(1);
+				uptime.last_heartbeat = now_u64;
+			});
+
+			Self::deposit_event(Event::HeartbeatReceived {
+				worker,
+				block: now,
+			});
+
+			Ok(())
+		}
+
+		/// Result submission from the off-chain worker (unsigned).
+		#[pallet::call_index(19)]
+		#[pallet::weight(T::WeightInfo::submit_result())]
+		pub fn unsigned_submit_result(
+			origin: OriginFor<T>,
+			job_id: JobId,
+			worker: T::AccountId,
+			result_hash: H256,
+			result_uri: Vec<u8>,
+		) -> DispatchResult {
+			ensure_none(origin)?;
+			ensure!(result_hash != H256::zero(), Error::<T>::InvalidResultHash);
+
+			let bounded_uri: BoundedVec<u8, T::MaxUriLen> =
+				result_uri.try_into().map_err(|_| Error::<T>::InvalidUri)?;
+			ensure!(!bounded_uri.is_empty(), Error::<T>::InvalidUri);
+
+			Jobs::<T>::try_mutate(job_id, |maybe_job| {
+				let job = maybe_job.as_mut().ok_or(Error::<T>::JobNotFound)?;
+				ensure!(job.status == JobStatus::Assigned, Error::<T>::InvalidJobStatus);
+				ensure!(
+					job.worker.as_ref() == Some(&worker),
+					Error::<T>::NotAssignedWorker
+				);
+
+				let now = <frame_system::Pallet<T>>::block_number();
+				ensure!(now <= job.deadline, Error::<T>::InvalidJobStatus);
+
+				let challenge_period = ChallengePeriodBlocks::<T>::get();
+				let challenge_end = now.saturating_add(challenge_period.into());
+
+				job.status = JobStatus::Submitted;
+				job.result_hash = Some(result_hash);
+				job.result_uri = Some(bounded_uri);
+				job.challenge_end = Some(challenge_end);
+
+				Self::deposit_event(Event::ResultSubmitted {
+					job_id,
+					worker: worker.clone(),
+					result_hash,
+					challenge_end,
+				});
+
+				Ok(())
+			})
+		}
+	}
+
+	// ─── Validate Unsigned ───────────────────────────────────────
+
+	#[pallet::validate_unsigned]
+	impl<T: Config> ValidateUnsigned for Pallet<T> {
+		type Call = Call<T>;
+
+		fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
+			match call {
+				Call::unsigned_heartbeat { worker } => {
+					// Worker must be registered
+					if !Workers::<T>::contains_key(worker) {
+						return InvalidTransaction::Custom(1).into();
+					}
+					ValidTransaction::with_tag_prefix("compute-marketplace-heartbeat")
+						.priority(1)
+						.longevity(5)
+						.and_provides(("heartbeat", worker.encode()))
+						.propagate(true)
+						.build()
+				},
+				Call::unsigned_submit_result { job_id, worker, .. } => {
+					// Job must exist and be assigned to this worker
+					if let Some(job) = Jobs::<T>::get(job_id) {
+						if job.status != JobStatus::Assigned || job.worker.as_ref() != Some(worker) {
+							return InvalidTransaction::Custom(2).into();
+						}
+					} else {
+						return InvalidTransaction::Custom(3).into();
+					}
+					ValidTransaction::with_tag_prefix("compute-marketplace-result")
+						.priority(10)
+						.longevity(10)
+						.and_provides(("result", job_id))
+						.propagate(true)
+						.build()
+				},
+				_ => InvalidTransaction::Call.into(),
+			}
 		}
 	}
 
