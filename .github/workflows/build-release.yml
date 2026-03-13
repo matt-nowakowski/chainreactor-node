@@ -69,8 +69,45 @@ jobs:
           name: ${{ matrix.artifact }}
           path: target/release/${{ matrix.artifact }}
 
+  build-worker:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            worker-daemon/target
+          key: ${{ runner.os }}-cargo-worker-daemon-${{ hashFiles('worker-daemon/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-worker-daemon-
+
+      - name: Build cr-worker
+        run: cd worker-daemon && cargo build --release
+        env:
+          CARGO_INCREMENTAL: 0
+
+      - name: Rename binary
+        run: |
+          cp worker-daemon/target/release/cr-worker worker-daemon/target/release/cr-worker-linux-amd64
+          chmod +x worker-daemon/target/release/cr-worker-linux-amd64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cr-worker-linux-amd64
+          path: worker-daemon/target/release/cr-worker-linux-amd64
+
   release:
-    needs: build
+    needs: [build, build-worker]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -111,6 +148,7 @@ jobs:
             cr-node-base-linux-amd64/cr-node-base-linux-amd64
             cr-node-pm-linux-amd64/cr-node-pm-linux-amd64
             cr-node-worker-linux-amd64/cr-node-worker-linux-amd64
+            cr-worker-linux-amd64/cr-worker-linux-amd64
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
