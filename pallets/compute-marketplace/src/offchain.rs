@@ -115,59 +115,91 @@ impl<T: Config> Pallet<T> {
             Ok(uri) => uri,
             Err(_) => {
                 log::error!("🔧 Compute OCW: invalid spec URI for job {}", job_id);
+                Self::clear_job_in_progress(job_id);
                 return;
             },
         };
 
-        let spec_bytes = match engine::download_spec(spec_uri) {
+        let spec_bytes = match Self::download_spec(spec_uri) {
             Ok(bytes) => bytes,
             Err(e) => {
                 log::error!("🔧 Compute OCW: failed to download spec for job {}: {}", job_id, e);
+                Self::clear_job_in_progress(job_id);
                 return;
             },
         };
 
-        // 2. Verify spec hash
-        let _actual_hash = T::Hashing::hash_of(&sp_core::Bytes(spec_bytes.clone()));
-        // Note: spec_hash verification is advisory — the requester set it,
-        // and the worker trusts the URI content matches.
+        log::info!("🔧 Compute OCW: downloaded spec ({} bytes) for job {}", spec_bytes.len(), job_id);
 
-        // 3. Parse and execute
-        let spec = match engine::parse_job_spec(&spec_bytes) {
-            Ok(s) => s,
-            Err(e) => {
-                log::error!("🔧 Compute OCW: failed to parse spec for job {}: {}", job_id, e);
-                return;
-            },
+        // 2. Execute the job (std-only — uses host process)
+        #[cfg(feature = "std")]
+        let (result_hash, output, success, error) = {
+            let spec = match crate::engine::parse_job_spec(&spec_bytes) {
+                Ok(s) => s,
+                Err(e) => {
+                    log::error!("🔧 Compute OCW: failed to parse spec for job {}: {}", job_id, e);
+                    Self::clear_job_in_progress(job_id);
+                    return;
+                },
+            };
+
+            let result = crate::engine::execute_job(&spec);
+            (result.result_hash, result.output, result.success, result.error)
         };
 
-        let result = engine::execute_job(&spec);
+        #[cfg(not(feature = "std"))]
+        let (result_hash, output, success, error) = {
+            // In WASM context we cannot execute — hash the spec as a placeholder
+            let hash = T::Hashing::hash_of(&sp_core::Bytes(spec_bytes.clone()));
+            // Convert the generic hash to H256
+            let hash_bytes: &[u8] = hash.as_ref();
+            let result_hash = if hash_bytes.len() >= 32 {
+                let mut arr = [0u8; 32];
+                arr.copy_from_slice(&hash_bytes[..32]);
+                sp_core::H256(arr)
+            } else {
+                sp_core::H256::zero()
+            };
+            (result_hash, spec_bytes, false, Some("WASM context — cannot execute".to_string()))
+        };
 
-        if !result.success {
+        if !success {
             log::error!(
                 "🔧 Compute OCW: job {} execution failed: {:?}",
                 job_id,
-                result.error
+                error
             );
-            // Still submit the result — the chain records what happened
-            // Worker's reputation will be affected if challenged
+        } else {
+            log::info!("🔧 Compute OCW: job {} executed successfully", job_id);
         }
 
-        // 4. Store result locally (the result_uri points to local storage for now)
-        // In production, this would upload to IPFS. For V1, we store the hash
-        // and use a local HTTP endpoint.
-        let result_hash = result.result_hash;
-        let result_uri = format!("local://job-{}/result", job_id);
-        let result_uri_bytes: Vec<u8> = result_uri.into_bytes();
+        // 3. Store result locally
+        Self::store_job_output(job_id, &output);
 
-        // Store the output in offchain local storage for retrieval
-        Self::store_job_output(job_id, &result.output);
+        // 4. Submit result on-chain via unsigned extrinsic
+        // Build result URI: "local://job-{id}/result"
+        let mut result_uri_bytes: Vec<u8> = b"local://job-".to_vec();
+        {
+            let mut id = job_id;
+            if id == 0 {
+                result_uri_bytes.push(b'0');
+            } else {
+                let mut digits = Vec::new();
+                while id > 0 {
+                    digits.push(b'0' + (id % 10) as u8);
+                    id /= 10;
+                }
+                digits.reverse();
+                result_uri_bytes.extend(digits);
+            }
+        }
+        result_uri_bytes.extend_from_slice(b"/result");
 
-        // 5. Submit result on-chain via unsigned extrinsic
         let bounded_uri: BoundedVec<u8, T::MaxUriLen> = match result_uri_bytes.try_into() {
             Ok(uri) => uri,
             Err(_) => {
                 log::error!("🔧 Compute OCW: result URI too long for job {}", job_id);
+                Self::clear_job_in_progress(job_id);
                 return;
             },
         };
@@ -195,6 +227,33 @@ impl<T: Config> Pallet<T> {
                 Self::clear_job_in_progress(job_id);
             },
         }
+    }
+
+    /// Download content from a URI using the OCW HTTP API.
+    fn download_spec(uri: &str) -> Result<Vec<u8>, &'static str> {
+        use sp_runtime::offchain::http;
+        use sp_runtime::offchain::Duration;
+
+        let deadline = sp_io::offchain::timestamp()
+            .add(Duration::from_millis(30_000));
+
+        let request = http::Request::get(uri);
+        let pending = request
+            .deadline(deadline)
+            .send()
+            .map_err(|_| "Failed to send HTTP request")?;
+
+        let response = pending
+            .try_wait(deadline)
+            .map_err(|_| "HTTP request timed out")?
+            .map_err(|_| "HTTP request failed")?;
+
+        if response.code != 200 {
+            return Err("HTTP non-200 from spec URI");
+        }
+
+        let body = response.body().collect::<Vec<u8>>();
+        Ok(body)
     }
 
     // ─── Offchain local storage helpers ───────────────────────
