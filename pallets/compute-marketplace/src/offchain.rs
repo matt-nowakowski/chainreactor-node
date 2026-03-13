@@ -131,42 +131,28 @@ impl<T: Config> Pallet<T> {
 
         log::info!("🔧 Compute OCW: downloaded spec ({} bytes) for job {}", spec_bytes.len(), job_id);
 
-        // 2. Execute the job
-        #[cfg(feature = "std")]
-        let (result_hash, output) = {
-            let spec = match crate::engine::parse_job_spec(&spec_bytes) {
-                Ok(s) => s,
-                Err(e) => {
-                    log::error!("🔧 Compute OCW: failed to parse spec for job {}: {}", job_id, e);
-                    Self::clear_job_in_progress(job_id);
-                    return;
-                },
-            };
-
-            let result = crate::engine::execute_job(&spec);
-            if !result.success {
-                log::error!("🔧 Compute OCW: job {} execution failed: {:?}", job_id, result.error);
-            } else {
+        // 2. Execute the job via local executor service (HTTP on localhost:9955)
+        //    The executor runs natively on the host — the OCW communicates via HTTP
+        //    since WASM cannot call std::process::Command directly.
+        let (result_hash, output) = match Self::execute_via_local_service(&spec_bytes) {
+            Ok((hash, out)) => {
                 log::info!("🔧 Compute OCW: job {} executed successfully", job_id);
-            }
-            (result.result_hash, result.output)
-        };
-
-        #[cfg(not(feature = "std"))]
-        let (result_hash, output) = {
-            // In WASM context we cannot execute host commands.
-            // This path only runs if the WASM runtime somehow gets here.
-            log::warn!("🔧 Compute OCW: WASM context, cannot execute job {}", job_id);
-            let hash = T::Hashing::hash_of(&spec_bytes);
-            let hash_bytes: &[u8] = hash.as_ref();
-            let rh = if hash_bytes.len() >= 32 {
-                let mut arr = [0u8; 32];
-                arr.copy_from_slice(&hash_bytes[..32]);
-                sp_core::H256(arr)
-            } else {
-                sp_core::H256::zero()
-            };
-            (rh, spec_bytes)
+                (hash, out)
+            },
+            Err(e) => {
+                log::error!("🔧 Compute OCW: job {} execution failed: {}", job_id, e);
+                // Still submit with a hash of the spec so the job doesn't hang
+                let hash = T::Hashing::hash_of(&spec_bytes);
+                let hash_bytes: &[u8] = hash.as_ref();
+                let rh = if hash_bytes.len() >= 32 {
+                    let mut arr = [0u8; 32];
+                    arr.copy_from_slice(&hash_bytes[..32]);
+                    sp_core::H256(arr)
+                } else {
+                    sp_core::H256::zero()
+                };
+                (rh, Vec::new())
+            },
         };
 
         // 3. Store result locally
@@ -223,6 +209,54 @@ impl<T: Config> Pallet<T> {
                 Self::clear_job_in_progress(job_id);
             },
         }
+    }
+
+    /// Execute a job spec via the local executor service.
+    /// POSTs the spec JSON to http://localhost:9955/execute, which runs the
+    /// command natively on the host and returns the Blake2-256 hash of stdout.
+    ///
+    /// Response format: first 32 bytes = result hash, remaining bytes = stdout output.
+    fn execute_via_local_service(spec_bytes: &[u8]) -> Result<(sp_core::H256, Vec<u8>), &'static str> {
+        use sp_runtime::offchain::http;
+        use sp_runtime::offchain::Duration;
+
+        let deadline = sp_io::offchain::timestamp()
+            .add(Duration::from_millis(120_000)); // 2 min timeout for execution
+
+        let request = http::Request::post(
+            "http://localhost:9955/execute",
+            sp_std::vec![spec_bytes.to_vec()],
+        );
+
+        let pending = request
+            .add_header("Content-Type", "application/json")
+            .deadline(deadline)
+            .send()
+            .map_err(|_| "Failed to send execution request")?;
+
+        let response = pending
+            .try_wait(deadline)
+            .map_err(|_| "Execution request timed out")?
+            .map_err(|_| "Execution request failed")?;
+
+        if response.code != 200 {
+            log::error!("🔧 Compute OCW: executor returned HTTP {}", response.code);
+            return Err("Executor returned non-200");
+        }
+
+        let body = response.body().collect::<Vec<u8>>();
+
+        // Response: first 32 bytes = Blake2-256 hash, rest = output
+        if body.len() < 32 {
+            return Err("Executor response too short");
+        }
+
+        let mut hash_bytes = [0u8; 32];
+        hash_bytes.copy_from_slice(&body[..32]);
+        let result_hash = sp_core::H256(hash_bytes);
+        let output = body[32..].to_vec();
+
+        Ok((result_hash, output))
     }
 
     /// Download content from a URI using the OCW HTTP API.
