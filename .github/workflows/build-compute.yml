@@ -1,22 +1,16 @@
-name: Build Compute Marketplace Binary
+name: Build Compute Marketplace
 
 on:
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Release tag (e.g. v1.19.8-compute)'
-        required: true
-        type: string
   push:
-    tags:
-      - 'v*-compute*'
+    branches:
+      - feat/compute-marketplace
 
 concurrency:
   group: build-compute-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-compute-node:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -42,8 +36,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-compute-
 
-      - name: Build compute marketplace release binary
-        run: cargo build --release --locked --features compute-marketplace
+      - name: Build compute node binary
+        run: cargo build --release --locked --features "compute-marketplace"
         env:
           CARGO_INCREMENTAL: 0
 
@@ -58,26 +52,95 @@ jobs:
           name: cr-node-compute-linux-amd64
           path: target/release/cr-node-compute-linux-amd64
 
+  build-worker-daemon:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            worker-daemon/target
+          key: ${{ runner.os }}-cargo-worker-daemon-${{ hashFiles('worker-daemon/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-worker-daemon-
+
+      - name: Build cr-worker daemon
+        run: cd worker-daemon && cargo build --release --locked
+        env:
+          CARGO_INCREMENTAL: 0
+
+      - name: Rename binary
+        run: |
+          cp worker-daemon/target/release/cr-worker worker-daemon/target/release/cr-worker-linux-amd64
+          chmod +x worker-daemon/target/release/cr-worker-linux-amd64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cr-worker-linux-amd64
+          path: worker-daemon/target/release/cr-worker-linux-amd64
+
   release:
-    needs: build
+    needs: [build-compute-node, build-worker-daemon]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
     steps:
-      - name: Download artifact
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest compute tag and bump
+        id: version
+        run: |
+          LATEST=$(git tag --sort=-v:refname --list 'v*-compute' | head -1)
+          echo "Latest compute tag: $LATEST"
+          if [ -z "$LATEST" ]; then
+            NEW_TAG="v1.19.11-compute"
+          else
+            VERSION=$(echo "$LATEST" | sed 's/-compute//')
+            MAJOR=$(echo "$VERSION" | sed 's/v//' | cut -d. -f1)
+            MINOR=$(echo "$VERSION" | sed 's/v//' | cut -d. -f2)
+            PATCH=$(echo "$VERSION" | sed 's/v//' | cut -d. -f3)
+            NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))-compute"
+          fi
+          echo "New tag: $NEW_TAG"
+          echo "NEW_TAG=$NEW_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag
+        run: |
+          git tag ${{ steps.version.outputs.NEW_TAG }}
+          git push origin ${{ steps.version.outputs.NEW_TAG }}
+
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag || github.ref_name }}
-          name: "Compute Marketplace - ${{ inputs.tag || github.ref_name }}"
+          tag_name: ${{ steps.version.outputs.NEW_TAG }}
+          name: "Compute Marketplace - ${{ steps.version.outputs.NEW_TAG }}"
+          body: |
+            Compute marketplace R&D release from `feat/compute-marketplace` branch.
+
+            **This is NOT a production release.** Do not use these binaries for mainline deployments.
+
+            Includes:
+            - `cr-node-compute-linux-amd64` — node with `compute-marketplace` pallet
+            - `cr-worker-linux-amd64` — standalone worker daemon
           files: |
             cr-node-compute-linux-amd64/cr-node-compute-linux-amd64
-          body: |
-            Compute marketplace demo binary. Built from `feat/compute-marketplace` branch with `--features compute-marketplace`.
-
-            This is a separate binary for the decentralized compute marketplace demo. It does NOT affect production deployments.
-            Production binaries (`cr-node-base`, `cr-node-pm`, `cr-node-worker`) are released separately from `main`.
+            cr-worker-linux-amd64/cr-worker-linux-amd64
+          generate_release_notes: false
+          prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
