@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feat/compute-marketplace
 
 concurrency:
   group: build-${{ github.ref }}
