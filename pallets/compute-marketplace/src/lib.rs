@@ -409,8 +409,8 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		#[cfg(feature = "std")]
 		fn offchain_worker(now: BlockNumberFor<T>) {
+			#[cfg(feature = "std")]
 			Self::run_offchain_worker(now);
 		}
 
