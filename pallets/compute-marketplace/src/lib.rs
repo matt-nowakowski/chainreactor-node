@@ -35,6 +35,7 @@ pub use types::*;
 #[cfg(feature = "std")]
 pub mod engine;
 
+#[cfg(feature = "std")]
 pub mod offchain;
 
 #[cfg(test)]
@@ -408,6 +409,7 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		#[cfg(feature = "std")]
 		fn offchain_worker(now: BlockNumberFor<T>) {
 			Self::run_offchain_worker(now);
 		}
