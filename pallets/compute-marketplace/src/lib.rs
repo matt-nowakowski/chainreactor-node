@@ -15,8 +15,9 @@
 //!   a randomly selected committee votes. Slashing for dishonest workers.
 //! - **Heartbeat & Availability** — workers submit periodic heartbeats to prove
 //!   liveness. Offline workers can't accept jobs.
-//! - **Built-in Execution** — the node's off-chain worker detects assigned jobs
-//!   and executes them natively on the host machine (command, Docker, WASM).
+//! - **External Execution** — the standalone `cr-compute` daemon polls the chain
+//!   for assigned jobs, executes them natively, and submits results via unsigned
+//!   extrinsics. The OCW path has been removed (see `offchain.rs` for rationale).
 //!
 //! ## Standalone Design
 //!
@@ -408,8 +409,9 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn offchain_worker(now: BlockNumberFor<T>) {
-			Self::run_offchain_worker(now);
+		fn offchain_worker(_now: BlockNumberFor<T>) {
+			// Intentionally empty — job execution is handled by the standalone
+			// cr-compute daemon, not the OCW. See offchain.rs for rationale.
 		}
 
 		fn on_initialize(now: BlockNumberFor<T>) -> Weight {

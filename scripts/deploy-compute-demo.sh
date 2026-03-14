@@ -11,7 +11,8 @@ DROPLET_NAME="cr-compute-demo"
 REGION="nyc1"
 SIZE="s-1vcpu-2gb"  # $12/mo — 1GB too small for Substrate
 IMAGE="ubuntu-22-04-x64"
-BINARY_URL="https://github.com/matt-nowakowski/chainreactor-node/releases/download/v1.19.13-compute/cr-node-compute-linux-amd64"
+BINARY_URL="https://github.com/matt-nowakowski/chainreactor-node/releases/download/v1.19.14-compute/cr-node-compute-linux-amd64"
+COMPUTE_DAEMON_URL="https://github.com/matt-nowakowski/chainreactor-node/releases/download/v1.19.14-compute/cr-compute-linux-amd64"
 
 echo "=== Creating droplet: $DROPLET_NAME ($SIZE in $REGION) ==="
 
@@ -103,9 +104,11 @@ done
 
 echo "=== Installing binary and starting chain ==="
 
-ssh -o StrictHostKeyChecking=no root@"$IP" bash -s -- "$BINARY_URL" << 'REMOTE_SCRIPT'
+ssh -o StrictHostKeyChecking=no root@"$IP" bash -s -- "$BINARY_URL" "$COMPUTE_DAEMON_URL" "$IP" << 'REMOTE_SCRIPT'
 set -euo pipefail
 BINARY_URL="$1"
+COMPUTE_DAEMON_URL="$2"
+PUBLIC_IP="$3"
 
 echo "--- Downloading compute binary ---"
 cd /usr/local/bin
@@ -125,7 +128,7 @@ ExecStart=/usr/local/bin/cr-node \
   --rpc-external \
   --rpc-cors=all \
   --rpc-methods=unsafe \
-  --offchain-worker=always \
+  --offchain-worker=never \
   --name "compute-demo-1"
 Restart=always
 RestartSec=5
@@ -161,6 +164,40 @@ curl -s -X POST http://localhost:9944 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"system_name","params":[]}'
 echo ""
+
+echo "--- Downloading cr-compute daemon ---"
+cd /usr/local/bin
+wget -q "$COMPUTE_DAEMON_URL" -O cr-compute
+chmod +x cr-compute
+
+echo "--- Creating result directory ---"
+mkdir -p /var/www/results
+
+echo "--- Creating cr-compute systemd service ---"
+cat > /etc/systemd/system/cr-compute.service << 'EOF'
+[Unit]
+Description=Chainreactor Compute Daemon
+After=cr-node.service
+Requires=cr-node.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/cr-compute \
+  --account 5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty \
+  --rpc-url http://127.0.0.1:9944 \
+  --result-dir /var/www/results \
+  --result-base-url http://${PUBLIC_IP}/results
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "--- Starting cr-compute daemon ---"
+systemctl daemon-reload
+systemctl enable cr-compute
+systemctl restart cr-compute
 
 REMOTE_SCRIPT
 

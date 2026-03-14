@@ -23,6 +23,8 @@ struct Args {
     heartbeat_interval: u64,
     poll_interval: u64,
     job_timeout: u64,
+    result_dir: String,
+    result_base_url: String,
 }
 
 impl Args {
@@ -33,6 +35,8 @@ impl Args {
             heartbeat_interval: 300,
             poll_interval: 6,
             job_timeout: 300,
+            result_dir: "/var/www/results".to_string(),
+            result_base_url: "http://127.0.0.1/results".to_string(),
         };
 
         let raw: Vec<String> = std::env::args().collect();
@@ -59,6 +63,14 @@ impl Args {
                     i += 1;
                     args.job_timeout = raw.get(i).and_then(|s| s.parse().ok()).unwrap_or(300);
                 }
+                "--result-dir" => {
+                    i += 1;
+                    args.result_dir = raw.get(i).cloned().unwrap_or_default();
+                }
+                "--result-base-url" => {
+                    i += 1;
+                    args.result_base_url = raw.get(i).cloned().unwrap_or_default();
+                }
                 "--help" | "-h" => {
                     eprintln!("cr-compute — Chainreactor Compute Daemon\n");
                     eprintln!("Usage: cr-compute --account <SS58_ADDRESS> [OPTIONS]\n");
@@ -68,6 +80,8 @@ impl Args {
                     eprintln!("  --heartbeat-interval <SECS>  Heartbeat interval [default: 300]");
                     eprintln!("  --poll-interval <SECS>       Job poll interval [default: 6]");
                     eprintln!("  --job-timeout <SECS>         Max job execution time [default: 300]");
+                    eprintln!("  --result-dir <PATH>          Directory to save result files [default: /var/www/results]");
+                    eprintln!("  --result-base-url <URL>      Base URL for result files [default: http://127.0.0.1/results]");
                     std::process::exit(0);
                 }
                 other => {
@@ -78,11 +92,17 @@ impl Args {
             i += 1;
         }
 
-        // Also check env var
+        // Also check env vars
         if args.account.is_empty() {
             if let Ok(v) = std::env::var("CR_COMPUTE_ACCOUNT") {
                 args.account = v;
             }
+        }
+        if let Ok(v) = std::env::var("CR_COMPUTE_RESULT_DIR") {
+            args.result_dir = v;
+        }
+        if let Ok(v) = std::env::var("CR_COMPUTE_RESULT_BASE_URL") {
+            args.result_base_url = v;
         }
 
         if args.account.is_empty() {
@@ -260,6 +280,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("  RPC: {}", args.rpc_url);
     info!("  Heartbeat interval: {}s", args.heartbeat_interval);
     info!("  Poll interval: {}s", args.poll_interval);
+    info!("  Result dir: {}", args.result_dir);
+    info!("  Result base URL: {}", args.result_base_url);
 
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
@@ -377,7 +399,7 @@ async fn scan_and_execute(
                 error!("Invalid job spec JSON for job {}: {}", job_id, e);
                 // Submit with hash of spec bytes as fallback
                 let result_hash = blake2_256(&spec_bytes);
-                let result_uri = format!("local://job-{}/result", job_id);
+                let result_uri = format!("{}/job-{}.json", args.result_base_url, job_id);
                 let _ = rpc::submit_unsigned_result(
                     client,
                     &args.rpc_url,
@@ -405,12 +427,24 @@ async fn scan_and_execute(
             warn!("Job {} execution failed: {}", job_id, error_msg);
         }
 
+        // Save output to result file
+        let result_filename = format!("job-{}.json", job_id);
+        let result_path = format!("{}/{}", args.result_dir, result_filename);
+        if let Err(e) = std::fs::create_dir_all(&args.result_dir) {
+            error!("Failed to create result dir {}: {}", args.result_dir, e);
+        }
+        match std::fs::write(&result_path, &output) {
+            Ok(()) => info!("Job {} result saved to {}", job_id, result_path),
+            Err(e) => error!("Failed to write result file {}: {}", result_path, e),
+        }
+
         // Hash the output
         let result_hash = blake2_256(&output);
         info!("Job {} result hash: 0x{}", job_id, hex::encode(result_hash));
 
         // Build result URI
-        let result_uri = format!("local://job-{}/result", job_id);
+        let result_uri = format!("{}/job-{}.json", args.result_base_url, job_id);
+        info!("Job {} result URI: {}", job_id, result_uri);
 
         // Submit result on-chain
         match rpc::submit_unsigned_result(
