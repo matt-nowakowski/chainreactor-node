@@ -71,6 +71,10 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxNameLen: Get<u32>;
 
+		/// Maximum length of solution group metadata (opaque bytes — URL, JSON, etc.).
+		#[pallet::constant]
+		type MaxMetadataLen: Get<u32>;
+
 		/// Maximum number of solution groups.
 		#[pallet::constant]
 		type MaxSolutionGroups: Get<u32>;
@@ -340,6 +344,8 @@ pub mod pallet {
 		PeriodNotComplete,
 		/// Arithmetic overflow.
 		ArithmeticOverflow,
+		/// Metadata exceeds maximum length.
+		MetadataTooLong,
 	}
 
 	// ─── Hooks ─────────────────────────────────────────────────
@@ -384,12 +390,16 @@ pub mod pallet {
 			consensus_threshold: Perbill,
 			round_length: u32,
 			reward_period_length: u32,
+			metadata: Vec<u8>,
 		) -> DispatchResult {
 			let owner = ensure_signed(origin)?;
 
 			let bounded_name: BoundedVec<u8, T::MaxNameLen> =
 				name.clone().try_into().map_err(|_| Error::<T>::InvalidName)?;
 			ensure!(!bounded_name.is_empty(), Error::<T>::InvalidName);
+
+			let bounded_metadata: BoundedVec<u8, T::MaxMetadataLen> =
+				metadata.try_into().map_err(|_| Error::<T>::MetadataTooLong)?;
 
 			let id = NextSolutionGroupId::<T>::get();
 			ensure!(id < T::MaxSolutionGroups::get(), Error::<T>::TooManySolutionGroups);
@@ -405,6 +415,7 @@ pub mod pallet {
 				round_length,
 				active: true,
 				created_at: now,
+				metadata: bounded_metadata,
 			};
 
 			SolutionGroups::<T>::insert(id, &group);
@@ -780,6 +791,7 @@ pub mod pallet {
 			sla_threshold: Option<Perbill>,
 			consensus_threshold: Option<Perbill>,
 			round_length: Option<u32>,
+			metadata: Option<Vec<u8>>,
 		) -> DispatchResult {
 			ensure_root(origin)?;
 
@@ -797,6 +809,9 @@ pub mod pallet {
 				}
 				if let Some(length) = round_length {
 					group.round_length = length;
+				}
+				if let Some(meta) = metadata {
+					group.metadata = meta.try_into().map_err(|_| Error::<T>::MetadataTooLong)?;
 				}
 
 				Self::deposit_event(Event::SolutionGroupUpdated {

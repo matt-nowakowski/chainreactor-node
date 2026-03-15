@@ -979,6 +979,7 @@ impl pallet_watchtower::Config for Runtime {
 parameter_types! {
     pub const WorkerPalletId: PalletId = PalletId(*b"cr/workr");
     pub const MaxWorkerNameLen: u32 = 128;
+    pub const MaxWorkerMetadataLen: u32 = 512;
     pub const MaxSolutionGroups: u32 = 256;
     pub const MaxVotesPerRound: u32 = 1024;
 }
@@ -989,6 +990,7 @@ impl pallet_worker::Config for Runtime {
     type Currency = Balances;
     type WorkerPalletId = WorkerPalletId;
     type MaxNameLen = MaxWorkerNameLen;
+    type MaxMetadataLen = MaxWorkerMetadataLen;
     type MaxSolutionGroups = MaxSolutionGroups;
     type MaxVotesPerRound = MaxVotesPerRound;
     type WeightInfo = ();

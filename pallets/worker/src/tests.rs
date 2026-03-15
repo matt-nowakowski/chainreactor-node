@@ -17,6 +17,7 @@ fn create_default_group() -> SolutionGroupId {
 		Perbill::from_percent(66), // consensus threshold (2/3)
 		10, // round length (10 blocks)
 		100, // reward period length
+		vec![], // metadata
 	));
 	0 // first group is always id 0
 }
@@ -54,6 +55,7 @@ fn create_group_with_empty_name_fails() {
 				Perbill::from_percent(66),
 				10,
 				100,
+				vec![],
 			),
 			Error::<TestRuntime>::InvalidName
 		);
@@ -119,6 +121,7 @@ fn subscribe_fails_with_insufficient_balance() {
 			Perbill::from_percent(66),
 			10,
 			100,
+			vec![],
 		));
 
 		assert_noop!(
@@ -358,8 +361,13 @@ fn noor_scanner_full_flow() {
 			Perbill::from_percent(66), // 2/3 consensus
 			10, // 10 block rounds
 			50, // 50 block reward periods
+			b"https://example.com".to_vec(), // metadata: target URL
 		));
 		let group_id = 0;
+
+		// Metadata (target URL) is stored and queryable
+		let group = SolutionGroups::<TestRuntime>::get(group_id).unwrap();
+		assert_eq!(group.metadata.to_vec(), b"https://example.com".to_vec());
 
 		// 4 noor scanner nodes subscribe as workers
 		assert_ok!(Worker::subscribe(RuntimeOrigin::signed(ALICE), group_id));
@@ -480,6 +488,7 @@ fn claim_rewards_below_sla_fails() {
 			Perbill::from_percent(51),
 			5, // 5 block rounds
 			20, // 20 block reward period
+			vec![],
 		));
 		let id = 0;
 
@@ -621,14 +630,14 @@ fn multiple_solution_groups_independent() {
 			RuntimeOrigin::signed(GROUP_OWNER),
 			b"Group A".to_vec(),
 			100, Perbill::from_percent(50), Perbill::from_percent(51),
-			10, 100,
+			10, 100, vec![],
 		));
 		// Group 1
 		assert_ok!(Worker::create_solution_group(
 			RuntimeOrigin::signed(GROUP_OWNER),
 			b"Group B".to_vec(),
 			200, Perbill::from_percent(50), Perbill::from_percent(51),
-			20, 100,
+			20, 100, vec![],
 		));
 
 		assert_ok!(Worker::subscribe(RuntimeOrigin::signed(ALICE), 0));

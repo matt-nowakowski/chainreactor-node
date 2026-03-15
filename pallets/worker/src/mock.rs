@@ -71,6 +71,7 @@ impl pallet_worker::Config for TestRuntime {
 	type Currency = Balances;
 	type WorkerPalletId = WorkerPalletId;
 	type MaxNameLen = ConstU32<128>;
+	type MaxMetadataLen = ConstU32<512>;
 	type MaxSolutionGroups = ConstU32<256>;
 	type MaxVotesPerRound = ConstU32<1024>;
 	type WeightInfo = ();

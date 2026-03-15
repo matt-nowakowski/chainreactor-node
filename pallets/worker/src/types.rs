@@ -28,6 +28,9 @@ pub struct SolutionGroup<T: Config> {
 	pub active: bool,
 	/// Block when this group was created
 	pub created_at: BlockNumberFor<T>,
+	/// Opaque metadata — use case specific (e.g. target URL, task config, JSON blob).
+	/// The pallet does not interpret this field; it is stored and queryable by clients.
+	pub metadata: BoundedVec<u8, T::MaxMetadataLen>,
 }
 
 /// Tracks a worker's subscription to a solution group
