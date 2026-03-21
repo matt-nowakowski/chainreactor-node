@@ -40,6 +40,7 @@ use frame_system::pallet_prelude::*;
 use sp_core::H256;
 use sp_runtime::{
 	traits::{AccountIdConversion, Saturating, Zero},
+	transaction_validity::{InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction},
 	Perbill, SaturatedConversion,
 };
 use sp_std::prelude::*;
@@ -527,7 +528,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Submit an attestation vote for the active round.
+		/// Submit an attestation vote for the active round (signed version).
 		/// `result_hash` is a Blake2-256 hash of the off-chain computation result.
 		#[pallet::call_index(4)]
 		#[pallet::weight(T::WeightInfo::submit_attestation())]
@@ -537,50 +538,21 @@ pub mod pallet {
 			result_hash: H256,
 		) -> DispatchResult {
 			let worker = ensure_signed(origin)?;
-			ensure!(result_hash != H256::zero(), Error::<T>::InvalidResultHash);
+			Self::do_submit_attestation(worker, solution_group_id, result_hash)
+		}
 
-			// Verify subscription exists and is past cooldown
-			let sub = Subscriptions::<T>::get(&worker, solution_group_id)
-				.ok_or(Error::<T>::NotSubscribed)?;
-			ensure!(sub.active, Error::<T>::NotSubscribed);
-
-			let now = <frame_system::Pallet<T>>::block_number();
-			let cooldown = SubscriptionCooldownBlocks::<T>::get();
-			let cooldown_end = sub.subscribed_at.saturating_add(cooldown.into());
-			ensure!(now >= cooldown_end, Error::<T>::SubscriptionCooldown);
-
-			// Get active round
-			let round_id = ActiveRound::<T>::get(solution_group_id)
-				.ok_or(Error::<T>::NoActiveRound)?;
-			let round = VotingRounds::<T>::get(round_id)
-				.ok_or(Error::<T>::RoundNotFound)?;
-			ensure!(!round.finalized, Error::<T>::RoundAlreadyFinalized);
-			ensure!(now <= round.ends_at, Error::<T>::RoundAlreadyFinalized);
-
-			// Check not already voted
-			ensure!(
-				!Votes::<T>::contains_key(round_id, &worker),
-				Error::<T>::AlreadyVoted
-			);
-
-			// Record vote
-			Votes::<T>::insert(round_id, &worker, result_hash);
-			VoteTallies::<T>::mutate(round_id, result_hash, |count| {
-				*count = count.saturating_add(1);
-			});
-			VotingRounds::<T>::mutate(round_id, |maybe_round| {
-				if let Some(r) = maybe_round {
-					r.total_votes = r.total_votes.saturating_add(1);
-				}
-			});
-
-			Self::deposit_event(Event::AttestationSubmitted {
-				worker,
-				round_id,
-				result_hash,
-			});
-
-			Ok(())
+		/// Submit an attestation vote (unsigned — no tx fees required).
+		/// Used by scanner nodes that don't hold tokens.
+		#[pallet::call_index(10)]
+		#[pallet::weight(T::WeightInfo::submit_attestation())]
+		pub fn unsigned_submit_attestation(
+			origin: OriginFor<T>,
+			worker: T::AccountId,
+			solution_group_id: SolutionGroupId,
+			result_hash: H256,
+		) -> DispatchResult {
+			ensure_none(origin)?;
+			Self::do_submit_attestation(worker, solution_group_id, result_hash)
 		}
 
 		/// Finalize a voting round after it has ended.
@@ -829,6 +801,54 @@ pub mod pallet {
 		/// The pallet's account ID (holds reward pool funds).
 		pub fn pallet_account() -> T::AccountId {
 			T::WorkerPalletId::get().into_account_truncating()
+		}
+
+		/// Internal attestation logic shared by signed and unsigned paths.
+		fn do_submit_attestation(
+			worker: T::AccountId,
+			solution_group_id: SolutionGroupId,
+			result_hash: H256,
+		) -> DispatchResult {
+			ensure!(result_hash != H256::zero(), Error::<T>::InvalidResultHash);
+
+			let sub = Subscriptions::<T>::get(&worker, solution_group_id)
+				.ok_or(Error::<T>::NotSubscribed)?;
+			ensure!(sub.active, Error::<T>::NotSubscribed);
+
+			let now = <frame_system::Pallet<T>>::block_number();
+			let cooldown = SubscriptionCooldownBlocks::<T>::get();
+			let cooldown_end = sub.subscribed_at.saturating_add(cooldown.into());
+			ensure!(now >= cooldown_end, Error::<T>::SubscriptionCooldown);
+
+			let round_id = ActiveRound::<T>::get(solution_group_id)
+				.ok_or(Error::<T>::NoActiveRound)?;
+			let round = VotingRounds::<T>::get(round_id)
+				.ok_or(Error::<T>::RoundNotFound)?;
+			ensure!(!round.finalized, Error::<T>::RoundAlreadyFinalized);
+			ensure!(now <= round.ends_at, Error::<T>::RoundAlreadyFinalized);
+
+			ensure!(
+				!Votes::<T>::contains_key(round_id, &worker),
+				Error::<T>::AlreadyVoted
+			);
+
+			Votes::<T>::insert(round_id, &worker, result_hash);
+			VoteTallies::<T>::mutate(round_id, result_hash, |count| {
+				*count = count.saturating_add(1);
+			});
+			VotingRounds::<T>::mutate(round_id, |maybe_round| {
+				if let Some(r) = maybe_round {
+					r.total_votes = r.total_votes.saturating_add(1);
+				}
+			});
+
+			Self::deposit_event(Event::AttestationSubmitted {
+				worker,
+				round_id,
+				result_hash,
+			});
+
+			Ok(())
 		}
 
 		/// Check if a voting round should end and a new one should start.
@@ -1110,6 +1130,42 @@ pub mod pallet {
 			// Convert back to Balance
 			let reward_balance: BalanceOf<T> = reward.saturated_into();
 			Ok(reward_balance)
+		}
+	}
+
+	#[pallet::validate_unsigned]
+	impl<T: Config> ValidateUnsigned for Pallet<T> {
+		type Call = Call<T>;
+
+		fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
+			match call {
+				Call::unsigned_submit_attestation { worker, solution_group_id, result_hash } => {
+					// Verify the worker is subscribed
+					if Subscriptions::<T>::get(worker, solution_group_id).is_none() {
+						return InvalidTransaction::BadSigner.into();
+					}
+
+					// Verify result hash is non-zero
+					if *result_hash == H256::zero() {
+						return InvalidTransaction::BadProof.into();
+					}
+
+					// Check not already voted in current round
+					if let Some(round_id) = ActiveRound::<T>::get(solution_group_id) {
+						if Votes::<T>::contains_key(round_id, worker) {
+							return InvalidTransaction::Stale.into();
+						}
+					}
+
+					ValidTransaction::with_tag_prefix("worker-attestation")
+						.priority(20_000)
+						.longevity(5)
+						.and_provides((worker.clone(), solution_group_id))
+						.propagate(true)
+						.build()
+				}
+				_ => InvalidTransaction::Call.into(),
+			}
 		}
 	}
 }
