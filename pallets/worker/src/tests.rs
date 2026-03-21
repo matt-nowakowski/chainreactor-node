@@ -661,3 +661,121 @@ fn multiple_solution_groups_independent() {
 		assert_eq!(Balances::reserved_balance(BOB), 200);
 	});
 }
+
+// ─── Auto-Distribution Tests ───────────────────────────────
+
+#[test]
+fn rewards_auto_distributed_on_period_advance() {
+	ExtBuilder::build().execute_with(|| {
+		// Group with short reward period (20 blocks)
+		assert_ok!(Worker::create_solution_group(
+			RuntimeOrigin::signed(GROUP_OWNER),
+			b"Auto Rewards".to_vec(),
+			500,
+			Perbill::from_percent(50), // 50% SLA
+			Perbill::from_percent(51), // majority consensus
+			5, // 5 block rounds
+			20, // 20 block reward period
+			vec![],
+		));
+		let id = 0;
+
+		assert_ok!(Worker::subscribe(RuntimeOrigin::signed(ALICE), id));
+		assert_ok!(Worker::subscribe(RuntimeOrigin::signed(BOB), id));
+
+		// Fund the reward pool
+		assert_ok!(Worker::fund_reward_pool(RuntimeOrigin::signed(GROUP_OWNER), id, 10_000));
+
+		let alice_before = Balances::free_balance(ALICE);
+		let bob_before = Balances::free_balance(BOB);
+
+		// Round 1: both agree
+		Worker::on_initialize(1);
+		assert_ok!(Worker::submit_attestation(RuntimeOrigin::signed(ALICE), id, hash(1)));
+		assert_ok!(Worker::submit_attestation(RuntimeOrigin::signed(BOB), id, hash(1)));
+
+		// Round 2: both agree
+		run_to_block(8);
+		assert_ok!(Worker::submit_attestation(RuntimeOrigin::signed(ALICE), id, hash(2)));
+		assert_ok!(Worker::submit_attestation(RuntimeOrigin::signed(BOB), id, hash(2)));
+
+		// Advance past reward period (20 blocks)
+		// This triggers auto-distribution in maybe_advance_period
+		run_to_block(25);
+
+		let period = RewardPeriods::<TestRuntime>::get(id).unwrap();
+		assert!(period.current > 0, "period should have advanced");
+
+		// Both workers should have received rewards automatically (no claim needed)
+		let alice_after = Balances::free_balance(ALICE);
+		let bob_after = Balances::free_balance(BOB);
+
+		assert!(alice_after > alice_before, "Alice should have earned rewards");
+		assert!(bob_after > bob_before, "Bob should have earned rewards");
+
+		// Both had equal stake (500) and equal correct votes (2) — rewards should be equal
+		let alice_reward = alice_after - alice_before;
+		let bob_reward = bob_after - bob_before;
+		assert_eq!(alice_reward, bob_reward, "equal stake + equal votes = equal rewards");
+
+		// Rewards should be marked as claimed (so manual claim fails)
+		assert!(RewardsClaimed::<TestRuntime>::get((id, 0u64, ALICE)));
+		assert!(RewardsClaimed::<TestRuntime>::get((id, 0u64, BOB)));
+	});
+}
+
+#[test]
+fn auto_distribution_skips_below_sla_workers() {
+	ExtBuilder::build().execute_with(|| {
+		assert_ok!(Worker::create_solution_group(
+			RuntimeOrigin::signed(GROUP_OWNER),
+			b"SLA Test".to_vec(),
+			500,
+			Perbill::from_percent(75), // 75% SLA
+			Perbill::from_percent(51),
+			5,
+			20,
+			vec![],
+		));
+		let id = 0;
+
+		assert_ok!(Worker::subscribe(RuntimeOrigin::signed(ALICE), id));
+		assert_ok!(Worker::subscribe(RuntimeOrigin::signed(BOB), id));
+		assert_ok!(Worker::subscribe(RuntimeOrigin::signed(CHARLIE), id));
+
+		assert_ok!(Worker::fund_reward_pool(RuntimeOrigin::signed(GROUP_OWNER), id, 10_000));
+
+		let alice_before = Balances::free_balance(ALICE);
+		let charlie_before = Balances::free_balance(CHARLIE);
+
+		// Round 1: all agree
+		Worker::on_initialize(1);
+		assert_ok!(Worker::submit_attestation(RuntimeOrigin::signed(ALICE), id, hash(1)));
+		assert_ok!(Worker::submit_attestation(RuntimeOrigin::signed(BOB), id, hash(1)));
+		assert_ok!(Worker::submit_attestation(RuntimeOrigin::signed(CHARLIE), id, hash(1)));
+
+		// Round 2: Alice disagrees (will drop below 75% SLA)
+		run_to_block(8);
+		assert_ok!(Worker::submit_attestation(RuntimeOrigin::signed(ALICE), id, hash(99)));
+		assert_ok!(Worker::submit_attestation(RuntimeOrigin::signed(BOB), id, hash(2)));
+		assert_ok!(Worker::submit_attestation(RuntimeOrigin::signed(CHARLIE), id, hash(2)));
+
+		// Round 3: Alice disagrees again
+		run_to_block(14);
+		assert_ok!(Worker::submit_attestation(RuntimeOrigin::signed(ALICE), id, hash(98)));
+		assert_ok!(Worker::submit_attestation(RuntimeOrigin::signed(BOB), id, hash(3)));
+		assert_ok!(Worker::submit_attestation(RuntimeOrigin::signed(CHARLIE), id, hash(3)));
+
+		// Advance past reward period — triggers auto-distribution
+		run_to_block(25);
+
+		let alice_after = Balances::free_balance(ALICE);
+		let charlie_after = Balances::free_balance(CHARLIE);
+
+		// Alice: 1/3 correct = 33% < 75% SLA — should NOT receive rewards
+		assert_eq!(alice_after, alice_before, "Alice below SLA should get nothing");
+
+		// Charlie: 3/3 correct = 100% — should receive rewards
+		assert!(charlie_after > charlie_before, "Charlie should have earned rewards");
+	});
+}

@@ -924,6 +924,7 @@ pub mod pallet {
 		}
 
 		/// Check if the reward period should advance.
+		/// When a period ends, automatically distributes rewards to all qualifying workers.
 		fn maybe_advance_period(
 			group_id: SolutionGroupId,
 			now: BlockNumberFor<T>,
@@ -939,6 +940,16 @@ pub mod pallet {
 				return Weight::from_parts(5_000, 0);
 			}
 
+			let completed_period = RewardPeriods::<T>::get(group_id)
+				.map(|p| p.current)
+				.unwrap_or(0);
+
+			// Auto-distribute rewards for the completed period
+			if let Some(group) = SolutionGroups::<T>::get(group_id) {
+				Self::auto_distribute_rewards(group_id, completed_period, &group);
+			}
+
+			// Advance to next period
 			RewardPeriods::<T>::mutate(group_id, |maybe_period| {
 				if let Some(period) = maybe_period {
 					let new_index = period.current.saturating_add(1);
@@ -953,7 +964,97 @@ pub mod pallet {
 				}
 			});
 
-			Weight::from_parts(25_000_000, 0)
+			Weight::from_parts(50_000_000, 0)
+		}
+
+		/// Distribute rewards to all qualifying workers for a completed period.
+		/// Workers must meet the SLA threshold and have submitted votes.
+		fn auto_distribute_rewards(
+			group_id: SolutionGroupId,
+			period_index: RewardPeriodIndex,
+			group: &SolutionGroup<T>,
+		) {
+			let pallet_account = Self::pallet_account();
+			let pool_balance: u128 = SaturatedConversion::saturated_into(
+				T::Currency::free_balance(&pallet_account)
+			);
+
+			if pool_balance == 0 {
+				return;
+			}
+
+			// Collect all qualifying workers and their weighted contributions
+			let mut qualifying: Vec<(T::AccountId, u128)> = Vec::new();
+			let mut total_weighted: u128 = 0;
+
+			for ((_gid, _pid, worker), perf) in Performance::<T>::iter() {
+				if _gid != group_id || _pid != period_index {
+					continue;
+				}
+				if perf.total_votes == 0 {
+					continue;
+				}
+
+				let accuracy = perf.accuracy();
+
+				// Check SLA threshold
+				if accuracy < group.sla_threshold {
+					Self::deposit_event(Event::SLAThresholdMissed {
+						worker: worker.clone(),
+						solution_group_id: group_id,
+						period: period_index,
+						accuracy,
+					});
+					continue;
+				}
+
+				// Already claimed manually? Skip.
+				if RewardsClaimed::<T>::get((group_id, period_index, &worker)) {
+					continue;
+				}
+
+				// Get stake
+				if let Some(sub) = Subscriptions::<T>::get(&worker, group_id) {
+					let stake: u128 = SaturatedConversion::saturated_into(sub.stake_locked);
+					let weighted = (perf.correct_votes as u128).saturating_mul(stake);
+					total_weighted = total_weighted.saturating_add(weighted);
+					qualifying.push((worker, weighted));
+				}
+			}
+
+			if total_weighted == 0 || qualifying.is_empty() {
+				return;
+			}
+
+			// Distribute proportionally
+			for (worker, weighted) in qualifying {
+				let reward = weighted
+					.saturating_mul(pool_balance)
+					.checked_div(total_weighted)
+					.unwrap_or(0);
+
+				if reward == 0 {
+					continue;
+				}
+
+				let reward_balance: BalanceOf<T> = reward.saturated_into();
+
+				if T::Currency::transfer(
+					&pallet_account,
+					&worker,
+					reward_balance,
+					ExistenceRequirement::AllowDeath,
+				).is_ok() {
+					RewardsClaimed::<T>::insert((group_id, period_index, &worker), true);
+
+					Self::deposit_event(Event::RewardsClaimed {
+						worker,
+						solution_group_id: group_id,
+						period: period_index,
+						amount: reward_balance,
+					});
+				}
+			}
 		}
 
 		/// Calculate a worker's reward for a completed period.
