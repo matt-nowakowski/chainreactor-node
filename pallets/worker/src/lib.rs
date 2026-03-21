@@ -126,6 +126,11 @@ pub mod pallet {
 	#[pallet::type_value]
 	pub fn DefaultCooldown() -> u32 { 1200 }
 
+	/// Maximum tokens to distribute per reward period. 0 = distribute entire pool.
+	/// Default: 0 (backwards compatible — distributes all).
+	#[pallet::storage]
+	pub type RewardPerPeriod<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
+
 	/// Auto-incrementing counter for solution group IDs.
 	#[pallet::storage]
 	pub type NextSolutionGroupId<T> = StorageValue<_, SolutionGroupId, ValueQuery>;
@@ -752,6 +757,19 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Set maximum reward distributed per period. Root only.
+		/// 0 = distribute entire pool balance (default, backwards compatible).
+		#[pallet::call_index(11)]
+		#[pallet::weight(Weight::from_parts(10_000_000, 0))]
+		pub fn set_reward_per_period(
+			origin: OriginFor<T>,
+			amount: BalanceOf<T>,
+		) -> DispatchResult {
+			ensure_root(origin)?;
+			RewardPerPeriod::<T>::put(amount);
+			Ok(())
+		}
+
 		/// Update a solution group's parameters. Root only.
 		/// Pass `None` for any field to leave it unchanged.
 		#[pallet::call_index(9)]
@@ -995,13 +1013,17 @@ pub mod pallet {
 			group: &SolutionGroup<T>,
 		) {
 			let pallet_account = Self::pallet_account();
-			let pool_balance: u128 = SaturatedConversion::saturated_into(
+			let full_balance: u128 = SaturatedConversion::saturated_into(
 				T::Currency::free_balance(&pallet_account)
 			);
 
-			if pool_balance == 0 {
+			if full_balance == 0 {
 				return;
 			}
+
+			// Cap distribution at RewardPerPeriod (0 = no cap)
+			let cap: u128 = SaturatedConversion::saturated_into(RewardPerPeriod::<T>::get());
+			let pool_balance = if cap > 0 && cap < full_balance { cap } else { full_balance };
 
 			// Collect all qualifying workers and their weighted contributions
 			let mut qualifying: Vec<(T::AccountId, u128)> = Vec::new();
